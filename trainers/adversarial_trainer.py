@@ -30,8 +30,8 @@ class AdversarialTrainer(Trainer):
         out = self.generator(batch_size)
         y1 = self.teacher(out)
         y2 = self.student(out)
-        # generator loss = -kldivloss - entropy loss
-        
+        # generator loss = -kldivloss
+
         # possibly condition the generator on a label 
         # + add cross-entropy loss between input label and teacher's output
         # --> In this scenario, we don't need adversarial training
