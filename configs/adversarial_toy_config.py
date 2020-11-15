@@ -12,7 +12,7 @@ config.seed = 1
 
 config.trainer = AdversarialTrainer
 config.tp.epochs = 16
-config.tp.log_train_every = 1000
+config.tp.log_train_every = 50
 config.tp.train_gen_every = 25
 config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
 config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')

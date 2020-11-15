@@ -32,7 +32,7 @@ class AdversarialTrainer(Trainer):
         generated_input, teacher_output = batch
         student_output = self.student(generated_input)
 
-        generator_loss = self.c.tp.generator_loss(teacher_output, student_output)
+        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
         student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
         result = {'student_loss': student_loss,
