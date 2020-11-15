@@ -4,6 +4,7 @@ import time
 import shutil
 import signal
 import subprocess
+from datetime import datetime
 
 def kill_processes_on_port(port):
     process = subprocess.Popen(["lsof", "-i", ":{0}".format(port)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -18,7 +19,7 @@ def initialize_dirs_and_files(args, config):
     if not os.path.exists(args.log_dir):
         os.mkdir(args.log_dir)
 
-    exp_path = os.path.join(args.log_dir, args.exp_name)
+    exp_path = os.path.join(args.log_dir, args.exp_name+'@'+str(round(datetime.utcnow().timestamp())))
     if not os.path.exists(exp_path):
         os.mkdir(exp_path)
     else:
