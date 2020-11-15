@@ -11,13 +11,13 @@ config.trainer = BasicTrainer
 config.tp.epochs = 16
 config.tp.log_train_every = 1000
 config.tp.loss = nn.CrossEntropyLoss()
-config.tp.test_loss = nn.CrossEntropyLoss()  
+config.tp.test_loss = nn.CrossEntropyLoss() # train and test separate for flexibility
 
 config.opt = Adam
 config.op.lr = 1e-3
 
 config.dataset = ToyGauss
-config.dp.seed = 1
+config.dp.seed = 1 # seed must match between test and train in order to use same underlying gaussians
 config.dp.gauss_dim = 3
 config.dp.num_classes = 3
 config.dp.batch_size = 128
