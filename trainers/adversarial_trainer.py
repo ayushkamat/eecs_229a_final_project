@@ -35,8 +35,8 @@ class AdversarialTrainer(Trainer):
         generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
         student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
-        result = {'student_loss': student_loss,
-                  'generator_loss': generator_loss}
+        result = {'train/student_loss': student_loss,
+                  'train/generator_loss': generator_loss}
 
         return result
 
@@ -47,14 +47,19 @@ class AdversarialTrainer(Trainer):
                 x,y = batch
                 pred = self.student(x)
                 loss = self.c.tp.test_loss(pred, y)
-                result['loss_test'] += loss
-                result['acc_test'] += (torch.argmax(pred, dim=1) == y).float().mean()
+                result['test/loss'] += loss
+                result['test/acc'] += (torch.argmax(pred, dim=1) == y).float().mean()
 
         for k in result:
             result[k] = result[k]/(i+1)
 
         self.log(result)
         return result
+
+    def zero_grads(self):
+        self.teacher.zero_grad()
+        self.generator.zero_grad()
+        self.student.zero_grad()
 
     def run(self):
         self.total_iterations = len(self.dataloader)*self.c.tp.epochs
@@ -65,23 +70,22 @@ class AdversarialTrainer(Trainer):
         student_loss = torch.tensor(0)
         for epoch in range(self.c.tp.epochs):
             for ind, batch in enumerate(self.dataloader):
+                self.zero_grads()
                 if ind % self.c.tp.train_gen_every == 0:
-                    self.gen_opt.zero_grad()
                     result = self.train(batch)
-                    generator_loss = result['generator_loss']
+                    generator_loss = result['train/generator_loss']
                     generator_loss.backward()
                     self.gen_opt.step()
                 else:
-                    self.stud_opt.zero_grad()
                     result = self.train(batch)
-                    student_loss = result['student_loss']
+                    student_loss = result['train/student_loss']
                     student_loss.backward()
                     self.stud_opt.step()
 
                 if self.iteration % self.c.tp.log_train_every == 0:
                     self.log(result)
                 self.iteration += 1
-                pbar.set_description("Epoch {}/{} | Gen Loss {} Student Loss {}".format(epoch+1, self.c.tp.epochs, generator_loss.item(), student_loss.item()))
+                pbar.set_description("Epoch {}/{} | Gen Loss {:.2e} Student Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item(), student_loss.item()))
                 pbar.update(1)
             self.test()
 

@@ -5,7 +5,6 @@ import subprocess
 import os
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="semi-sup")
     parser.add_argument("-c", "--config", type=str, required=True,help='path to config file')
@@ -26,6 +25,8 @@ if __name__ == "__main__":
 
     # start tensorboard
     env = dict(os.environ)   # Make a copy of the current environment
-    subprocess.Popen('tensorboard --port {} --logdir ./{}'.format(args.tb_port, args.log_dir), env=env, shell=True)
+    subprocess.Popen('tensorboard --port {} --logdir ./{}'.format(args.tb_port, args.log_dir), env=env, shell=True) 
+
+    utils.set_seed(config.seed)
     trainer = config.trainer(config)
     trainer.run()

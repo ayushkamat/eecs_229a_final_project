@@ -5,6 +5,9 @@ import shutil
 import signal
 import subprocess
 from datetime import datetime
+import torch
+import numpy as np
+import random
 
 def kill_processes_on_port(port):
     process = subprocess.Popen(["lsof", "-i", ":{0}".format(port)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -34,3 +37,14 @@ def initialize_dirs_and_files(args, config):
     config.weights_path = weights_path
     filename = os.path.join(exp_path, 'config.json')
     json.dump(config.toDict(), open(filename, 'w'), default=lambda o: str(o), indent=4)
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)  # Numpy module.
+    random.seed(seed)  # Python random module.
+    torch.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False # True has memory overhead, minimal speedup
+    torch.backends.cudnn.deterministic = False # eh
+    os.environ['PYTHONHASHSEED'] = str(seed)

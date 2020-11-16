@@ -39,4 +39,4 @@ class ToyGauss(Dataset):
         return self.dp.num_samples
 
     def __getitem__(self, idx):
-        return self.xs[idx], self.ys[idx].squeeze()
+        return self.xs[idx].to(self.dp.device), self.ys[idx].squeeze().to(self.dp.device)

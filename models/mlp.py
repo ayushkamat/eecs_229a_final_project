@@ -9,4 +9,4 @@ def mlp(mp):
         in_size = size
     layers.append(nn.Linear(in_size, mp.output_size))
     layers.append(mp.output_activation)
-    return nn.Sequential(*layers)
+    return nn.Sequential(*layers).to(mp.device)

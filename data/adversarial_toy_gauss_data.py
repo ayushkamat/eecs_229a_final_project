@@ -16,4 +16,4 @@ class AdversarialToyGauss(Dataset):
     def __getitem__(self, idx):
         generated_input = self.dp.generator()
         y = self.dp.teacher(generated_input)
-        return generated_input.squeeze(), y.squeeze()
+        return generated_input.squeeze().to(self.dp.device), y.squeeze().to(self.dp.device)

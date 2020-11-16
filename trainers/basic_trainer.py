@@ -24,7 +24,7 @@ class BasicTrainer(Trainer):
         x, y = batch
         pred = self.model(x)
         loss = self.c.tp.loss(pred, y)
-        result['loss'] = loss
+        result['train/loss'] = loss
         return result
 
     def test(self):
@@ -34,8 +34,8 @@ class BasicTrainer(Trainer):
                 x,y = batch
                 pred = self.model(x)
                 loss = self.c.tp.test_loss(pred, y)
-                result['loss_test'] += loss
-                result['acc_test'] += (torch.argmax(pred, dim=1) == y).float().mean()
+                result['test/loss'] += loss
+                result['test/acc'] += (torch.argmax(pred, dim=1) == y).float().mean()
 
         for k in result:
             result[k] = result[k]/(i+1)
@@ -52,13 +52,13 @@ class BasicTrainer(Trainer):
             for batch in self.dataloader:
                 self.opt.zero_grad()
                 result = self.train(batch)
-                loss = result['loss']
+                loss = result['train/loss']
                 loss.backward()
                 self.opt.step()
                 if self.iteration % self.c.tp.log_train_every == 0:
                     self.log(result)
                 self.iteration += 1
-                pbar.set_description("Epoch {}/{} | Loss {}".format(epoch+1, self.c.tp.epochs, loss.item()))
+                pbar.set_description("Epoch {}/{} | Loss {:.2e}".format(epoch+1, self.c.tp.epochs, loss.item()))
                 pbar.update(1)
             self.test()
 
