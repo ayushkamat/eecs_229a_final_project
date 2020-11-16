@@ -167,3 +167,5 @@ old_logs/
 ._*
 **DS_Store**
 **.vscode/
+*.pt
+data/cache/*
