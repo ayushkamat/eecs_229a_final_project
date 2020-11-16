@@ -15,7 +15,7 @@ class BasicTrainer(Trainer):
         self.model = self.c.model(self.c.mp)
         self.dataset = self.c.dataset(self.c.dp)
         self.dataloader = DataLoader(self.dataset, batch_size=self.c.dp.batch_size)
-        self.test_dataset = self.c.test_dataset(self.c.tdp)
+        self.test_dataset = self.c.test_dataset(self.c.tdp, mode='test')
         self.test_dataloader = DataLoader(self.test_dataset, batch_size=self.c.tdp.batch_size)
         self.opt = self.c.opt(self.model.parameters(), lr = self.c.op.lr)
 
