@@ -51,4 +51,4 @@ class MNISTData(MNIST):
         return len(self.xs)
 
     def __getitem__(self, idx):
-        return self.xs[idx].float(), self.ys[idx].squeeze()
+        return self.xs[idx].float().to(self.dp.device), self.ys[idx].squeeze().to(self.dp.device)
