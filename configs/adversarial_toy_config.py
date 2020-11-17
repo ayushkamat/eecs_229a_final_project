@@ -15,7 +15,7 @@ config.trainer = AdversarialTrainer
 config.tp.epochs = 16
 config.tp.log_train_every = 50
 config.tp.train_gen_every = 2
-config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
+config.tp.generator_loss = lambda input, target : - nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target) + torch.sum(torch.log(input))
 config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
 config.tp.test_loss = nn.NLLLoss() 
 config.tp.use_gpu = False
