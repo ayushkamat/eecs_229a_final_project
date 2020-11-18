@@ -70,7 +70,7 @@ class DistanceTrainer(Trainer):
             teacher_opt = self.c.opt(teacher.parameters(), lr = self.c.op.lr)
             for epoch in range(self.c.tp.epochs):
                 for ind, batch in enumerate(dataloader):
-                    teacher.zero_grads()
+                    teacher_opt.zero_grad()
                     result = self.train(teacher, batch, self.c.tp.teacher_loss)
                     teacher_loss = result['train/loss']
                     teacher_loss.backward()
@@ -87,7 +87,7 @@ class DistanceTrainer(Trainer):
                 student_opt = self.c.opt(student.parameters(), lr = self.c.op.lr)
                 for epoch in range(self.c.tp.epochs):
                     for ind, batch in enumerate(student_loader):
-                        student.zero_grads()
+                        student_opt.zero_grad()
                         xs = batch[0]
                         ys = self.teacher(xs)
                         result = self.train(student, (xs, ys), self.c.tp.teacher_loss)
