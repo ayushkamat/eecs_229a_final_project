@@ -13,8 +13,6 @@ class GMMData(Dataset):
     def __init__(self, dp, mode='train'):
         self.dp = dp
         self.gaussians = []
-        if dp.prior is None: 
-            dp.prior = np.ones(dp.num_classes, dtype=float) / dp.num_classes
 
         torch.manual_seed(dp.seed)
         self.init_gauss()
@@ -34,7 +32,7 @@ class GMMData(Dataset):
         """
         xs = []
         for _ in range(nsample):
-            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            rand_index = np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[rand_index]
             xs.append(gaussian.sample())
         return xs
@@ -51,14 +49,14 @@ class GMMData(Dataset):
 
     def __getitem__(self, idx):
         if type(idx) is int:
-            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            rand_index = np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             return item.to(self.dp.device), torch.tensor(rand_index).to(self.dp.device)
 
         xs, ys = [], []
         for _ in range(len(idx)):
-            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            rand_index = np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             xs.append(item)
@@ -73,7 +71,7 @@ class GMMTeacherData(GMMData):
     """
     def __getitem__(self, idx):
         if type(idx) is int:
-            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            rand_index = np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             y = self.dp.teacher(item)
@@ -81,7 +79,7 @@ class GMMTeacherData(GMMData):
 
         xs, ys = [], []
         for _ in range(len(idx)):
-            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            rand_index = np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             y = self.dp.teacher(item)
