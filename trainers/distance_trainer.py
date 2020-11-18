@@ -78,7 +78,7 @@ class DistanceTrainer(Trainer):
                     teacher_loss = result['train/loss']
                     teacher_loss.backward()
                     teacher_opt.step()
-                    pbar3.update(1)
+                    pbar3.update(self.c.dp.batch_size)
             teacher_result = self.test(teacher, dataloader)
             teacher_acc = teacher_result['test/acc']
             pbar1.set_description("Teacher {} acc {:.2e}".format(n, teacher_acc))
@@ -101,7 +101,7 @@ class DistanceTrainer(Trainer):
                         student_loss = result['train/loss']
                         student_loss.backward()
                         student_opt.step()
-                        pbar3.update(1)
+                        pbar3.update(self.c.dp.batch_size)
 
                 comp = self.compare(teacher, student, dataset, student_data)
                 comp['test/teacher_acc'] = teacher_acc
