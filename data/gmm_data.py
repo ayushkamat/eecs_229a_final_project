@@ -9,25 +9,24 @@ class GMMData(Dataset):
     GMM dataset: X is sample from Gaussian i, Y is the id of the Gaussian
     Gaussian centers and variance are defined in config
     """
-    gaussians = []
 
     def __init__(self, dp, mode='train'):
         self.dp = dp
+        self.gaussians = []
         if dp.prior is None: 
             dp.prior = np.ones(dp.num_classes, dtype=float) / dp.num_classes
 
         torch.manual_seed(dp.seed)
-        if not len(self.__class__.guassians):
-            self.init_gauss()
+        self.init_gauss()
 
     def init_gauss(self):
-        self.__class__.gaussians = []
+        self.gaussians = []
         for ind in range(self.dp.num_classes):
             mean = torch.randint(-100, 100, (self.dp.gauss_dim,))
             m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
             cov_mtx =  m@m.T + torch.eye(self.dp.gauss_dim)
             m = MultivariateNormal(mean.float(), cov_mtx)
-            self.__class__.gaussians.append(m)
+            self.gaussians.append(m)
 
     def sample(self, nsample):
         """
@@ -36,7 +35,7 @@ class GMMData(Dataset):
         xs = []
         for _ in range(nsample):
             rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
-            gaussian = self.__class__.gaussians[rand_index]
+            gaussian = self.gaussians[rand_index]
             xs.append(gaussian.sample())
         return xs
 
@@ -44,7 +43,7 @@ class GMMData(Dataset):
         """
         Compute likelihood of point x
         """
-        probs = [g.log_prob(x) for g in self.__class__.gaussians]
+        probs = [g.log_prob(x) for g in self.gaussians]
         return torch.sum(probs) / self.dp.num_classes
 
     def __len__(self):
@@ -55,7 +54,7 @@ class GMMData(Dataset):
         if type(idx) is int: idx = [idx]
         for _ in range(len(idx)):
             rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
-            gaussian = self.__class__.gaussians[rand_index]
+            gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             xs.append(item)
             ys.append(rand_idx)
@@ -72,7 +71,7 @@ class GMMTeacherData(GMMData):
         if type(idx) is int: idx = [idx]
         for _ in range(len(idx)):
             rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
-            gaussian = self.__class__.gaussians[rand_index]
+            gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             y = self.dp.teacher(item)
             xs.append(item)
