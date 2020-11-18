@@ -13,8 +13,6 @@ class GMMData(Dataset):
     def __init__(self, dp, mode='train'):
         self.dp = dp
         self.gaussians = []
-
-        torch.manual_seed(dp.seed)
         self.init_gauss()
 
     def init_gauss(self):
@@ -35,14 +33,21 @@ class GMMData(Dataset):
             rand_index = np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[rand_index]
             xs.append(gaussian.sample())
-        return xs
+        return torch.stack(xs).to(self.dp.device)
 
     def log_prob(self, x):
         """
         Compute likelihood of point x
         """
-        probs = [g.log_prob(x) for g in self.gaussians]
-        return torch.sum(probs) / self.dp.num_classes
+        if len(x.shape) == 1:
+            probs = torch.stack([torch.exp(g.log_prob(x)) for g in self.gaussians]).to(self.dp.device)
+            return torch.log(torch.sum(probs) / self.dp.num_classes)
+
+        out = []
+        for pt in x:
+            probs = torch.stack([torch.exp(g.log_prob(pt)) for g in self.gaussians]).to(self.dp.device)
+            out.append(torch.sum(probs) / self.dp.num_classes)
+        return torch.log(torch.stack(out).to(self.dp.device))
 
     def __len__(self):
         return self.dp.num_samples

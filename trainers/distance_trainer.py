@@ -27,7 +27,7 @@ class DistanceTrainer(Trainer):
         return result
 
     def test(self, model, dataloader):
-        result = defaultdict(lambda: 0)
+        result = {'test/loss':0, 'test/acc':0}
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 x,y = batch
@@ -41,12 +41,12 @@ class DistanceTrainer(Trainer):
         return result
 
     def compare(self, teacher, student, teacher_data, student_data):
-        result = defaultdict(lambda: 0)
+        result = {'test/acc':0}
         dataloader = DataLoader(teacher_data, batch_size=self.c.dp.batch_size)
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 x,y = batch
-                pred = self.student(x)
+                pred = student(x)
                 loss = self.c.tp.test_loss(pred, y)
                 result['test/acc'] += (torch.argmax(pred, dim=1) == y).float().mean()
         
@@ -97,6 +97,7 @@ class DistanceTrainer(Trainer):
                         student_opt.zero_grad()
                         xs = batch[0]
                         ys = teacher(xs)
+                        ys = torch.argmax(ys, dim=1)
                         result = self.train(student, (xs, ys), self.c.tp.teacher_loss)
                         student_loss = result['train/loss']
                         student_loss.backward()
