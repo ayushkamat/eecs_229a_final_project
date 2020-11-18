@@ -20,6 +20,9 @@ config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('
 config.opt = Adam
 config.op.lr = 1e-3
 
+config.N_teachers = 10
+config.N_students = 10
+
 config.dataset = GMMData
 config.dp.device = config.tp.device
 config.dp.seed = config.seed

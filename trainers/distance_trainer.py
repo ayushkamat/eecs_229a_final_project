@@ -15,7 +15,6 @@ class DistanceTrainer(Trainer):
     """
     def __init__(self, config):
         super().__init__(config)
-        self.c.dp.teacher = self.teacher
         self.Nt = self.c.N_teachers
         self.Ns = self.c.N_students
         self.save_path = os.path.join(self.c.weights_path, 'distance.pkl')
