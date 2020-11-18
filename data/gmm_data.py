@@ -50,16 +50,21 @@ class GMMData(Dataset):
         return self.dp.num_samples
 
     def __getitem__(self, idx):
+        if type(idx) is int:
+            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            gaussian = self.gaussians[rand_index]
+            item = gaussian.sample()
+            return item.to(self.dp.device), torch.tensor(rand_index).to(self.dp.device)
+
         xs, ys = [], []
-        if type(idx) is int: idx = [idx]
         for _ in range(len(idx)):
             rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
             gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             xs.append(item)
-            ys.append(rand_index)
+            ys.append(torch.tensor(rand_index))
 
-        return xs, ys
+        return torch.stack(xs).to(self.dp.device), torch.stack(ys).to(self.dp.device)
 
 
 class GMMTeacherData(GMMData):
@@ -67,8 +72,14 @@ class GMMTeacherData(GMMData):
     Same structure as above, but uses teacher to label data
     """
     def __getitem__(self, idx):
+        if type(idx) is int:
+            rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
+            gaussian = self.gaussians[rand_index]
+            item = gaussian.sample()
+            y = self.dp.teacher(item)
+            return item.to(self.dp.device), y.to(self.dp.device)
+
         xs, ys = [], []
-        if type(idx) is int: idx = [idx]
         for _ in range(len(idx)):
             rand_index = np.random.choice(np.arange(self.dp.num_classes), p=self.dp.prior)
             gaussian = self.gaussians[rand_index]
@@ -77,4 +88,5 @@ class GMMTeacherData(GMMData):
             xs.append(item)
             ys.append(y)
 
-        return xs, ys
+        return torch.stack(xs).to(self.dp.device), torch.stack(ys).to(self.dp.device)
+
