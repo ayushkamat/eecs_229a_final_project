@@ -57,7 +57,7 @@ class GMMData(Dataset):
             gaussian = self.gaussians[rand_index]
             item = gaussian.sample()
             xs.append(item)
-            ys.append(rand_idx)
+            ys.append(rand_index)
 
         return xs, ys
 
