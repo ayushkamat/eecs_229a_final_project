@@ -30,6 +30,7 @@ config.dp.gauss_dim = 5
 config.dp.num_classes = 5
 config.dp.batch_size = 128
 config.dp.num_samples = 100000
+config.dp.prior = None
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device
