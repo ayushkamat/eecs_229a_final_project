@@ -58,8 +58,8 @@ class DistanceTrainer(Trainer):
 
     def run(self):
         res = []
-        pbar1 = tqdm(total=self.Ns*self.Nt, position=0)
-        pbar2 = tqdm(total=self.Ns*self.Nt, position=1)
+        pbar1 = tqdm(total=self.Ns*self.Nt, position=0, leave=True)
+        pbar2 = tqdm(total=self.Ns*self.Nt, position=1, leave=True)
         pbar1.set_description("Teacher first run...")
         pbar2.set_description("Student not run...")
         
@@ -70,7 +70,7 @@ class DistanceTrainer(Trainer):
             dataloader = DataLoader(dataset, batch_size=self.c.dp.batch_size)
             teacher = self.c.teacher.model(self.c.teacher)
             teacher_opt = self.c.opt(teacher.parameters(), lr = self.c.op.lr)
-            pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=2)
+            pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=2, leave=False)
             for epoch in range(self.c.tp.epochs):
                 for ind, batch in enumerate(dataloader):
                     teacher_opt.zero_grad()
@@ -85,12 +85,12 @@ class DistanceTrainer(Trainer):
             pbar1.update(1)
 
             for m in range(self.Ns):
-                student_data = self.c.dataset(self.c.dp)
+                std = float(m) / self.Ns
+                student_data = dataset.copy(std=std)
                 student_loader = DataLoader(student_data, batch_size=self.c.dp.batch_size)
                 student = self.c.student.model(self.c.student)
                 student_opt = self.c.opt(student.parameters(), lr = self.c.op.lr)
-                pbar2.set_description("Student run {0} start".format(m))
-                pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=2)
+                pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=2, leave=False)
                 pbar3.update(1)
                 for epoch in range(self.c.tp.epochs):
                     for ind, batch in enumerate(student_loader):

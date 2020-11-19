@@ -28,11 +28,13 @@ config.N_students = 10
 config.dataset = GMMData
 config.dp.device = config.tp.device
 config.dp.seed = config.seed
-config.dp.gauss_dim = 5
-config.dp.num_classes = 5
+config.dp.gauss_dim = 4
+config.dp.num_classes = 4
 config.dp.batch_size = 128
-config.dp.num_samples = 100000
+config.dp.num_samples = 10000
 config.dp.prior = None
+config.dp.loc_lower = -2
+config.dp.loc_upper = 2
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device
@@ -45,7 +47,7 @@ config.teacher.output_activation= nn.LogSoftmax(dim=1)
 config.student.model = mlp
 config.student.device = config.tp.device
 config.student.input_size = config.dp.gauss_dim
-config.student.hidden_sizes = [8, 8, 8]
+config.student.hidden_sizes = [8, 32, 16]
 config.student.output_size = config.dp.num_classes
 config.student.activation = nn.ReLU()
 config.student.output_activation= nn.LogSoftmax(dim=1)

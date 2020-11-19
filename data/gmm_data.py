@@ -10,19 +10,37 @@ class GMMData(Dataset):
     Gaussian centers and variance are defined in config
     """
 
-    def __init__(self, dp, mode='train'):
+    def __init__(self, dp, means=None, cov_mtx=None, mode='train'):
         self.dp = dp
         self.gaussians = []
-        self.init_gauss()
+        self.means = means
+        self.cov_mtx = cov_mtx
+        self.mode = mode
+        self.init_gauss(means, cov_mtx)
 
-    def init_gauss(self):
+    def init_gauss(self, means=None, cov_mtx=None):
         self.gaussians = []
+        _means = []
         for ind in range(self.dp.num_classes):
-            mean = torch.randint(-100, 100, (self.dp.gauss_dim,))
-            m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
-            cov_mtx =  m@m.T + torch.eye(self.dp.gauss_dim)
+            lb, ub = self.dp.loc_lower, self.dp.loc_upper
+            mean = means[ind] if means is not None else torch.randint(lb, ub+1, (self.dp.gauss_dim,))
+            _means.append(mean)
+            if cov_mtx is None:
+                m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
+                cov_mtx =  m@m.T + torch.eye(self.dp.gauss_dim)
             m = MultivariateNormal(mean.float(), cov_mtx)
             self.gaussians.append(m)
+        self.means = torch.tensor(_means).to(self.dp.device)
+
+    def copy(self, std=0):
+        means = self.means
+        cov_mtx = self.cov_mtx
+        if std > 0:
+            means += torch.normal(torch.zeros(self.dp.gauss_dim), torch.tensor(std).to(self.dp.device))
+            m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
+            cov_mtx =  m@m.T + torch.eye(self.dp.gauss_dim)
+
+        return GMMData(self.dp, means, cov_mtx, self.mode)
 
     def sample(self, nsample):
         """
