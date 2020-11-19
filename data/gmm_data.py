@@ -1,5 +1,7 @@
 from torch.utils.data import Dataset
 from torch.distributions.multivariate_normal import MultivariateNormal
+
+import copy
 import numpy as np
 import torch
 
@@ -10,37 +12,43 @@ class GMMData(Dataset):
     Gaussian centers and variance are defined in config
     """
 
-    def __init__(self, dp, means=None, cov_mtx=None, mode='train'):
+    def __init__(self, dp, means=None, cov_mtxs=None, mode='train'):
         self.dp = dp
         self.gaussians = []
         self.means = means
-        self.cov_mtx = cov_mtx
+        self.cov_mtxs = cov_mtxs
         self.mode = mode
-        self.init_gauss(means, cov_mtx)
+        self.init_gauss(means, cov_mtxs)
 
-    def init_gauss(self, means=None, cov_mtx=None):
+    def init_gauss(self, means=None, cov_mtxs=None):
         self.gaussians = []
         _means = []
+        _cov_mtx = []
         for ind in range(self.dp.num_classes):
             lb, ub = self.dp.loc_lower, self.dp.loc_upper
             mean = means[ind] if means is not None else torch.randint(lb, ub+1, (self.dp.gauss_dim,))
             _means.append(mean)
-            if cov_mtx is None:
+            if cov_mtxs is None:
                 m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
-                cov_mtx =  m@m.T + torch.eye(self.dp.gauss_dim)
+                cov_mtx = m@m.T + 1e-1*torch.eye(self.dp.gauss_dim)
+            else:
+                cov_mtx = cov_mtxs[ind]
+            _cov_mtx.append(cov_mtx)
             m = MultivariateNormal(mean.float(), cov_mtx)
             self.gaussians.append(m)
-        self.means = torch.tensor(_means).to(self.dp.device)
+        self.means = torch.stack(_means).to(self.dp.device)
+        self.cov_mtxs = torch.stack(_cov_mtx).to(self.dp.device)
 
     def copy(self, std=0):
-        means = self.means
-        cov_mtx = self.cov_mtx
+        means = copy.copy(self.means)
+        cov_mtxs = copy.copy(self.cov_mtxs)
         if std > 0:
-            means += torch.normal(torch.zeros(self.dp.gauss_dim), torch.tensor(std).to(self.dp.device))
-            m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
-            cov_mtx =  m@m.T + torch.eye(self.dp.gauss_dim)
+            for ind in range(len(means)):
+                means[ind] = means[ind] + torch.normal(torch.zeros(self.dp.gauss_dim), torch.tensor(std).to(self.dp.device))
+                m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
+                cov_mtxs[ind] = m@m.T + 1e-1*torch.eye(self.dp.gauss_dim)
 
-        return GMMData(self.dp, means, cov_mtx, self.mode)
+        return GMMData(self.dp, means, cov_mtxs, self.mode)
 
     def sample(self, nsample):
         """

@@ -58,7 +58,7 @@ class DistanceTrainer(Trainer):
 
     def run(self):
         res = []
-        pbar1 = tqdm(total=self.Ns*self.Nt, position=0, leave=True)
+        pbar1 = tqdm(total=self.Nt, position=0, leave=True)
         pbar2 = tqdm(total=self.Ns*self.Nt, position=1, leave=True)
         pbar1.set_description("Teacher first run...")
         pbar2.set_description("Student not run...")
