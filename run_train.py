@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser.add_argument("-exp_name", type=str, help='name of this run')
     parser.add_argument("--log_dir", type=str, default='logs')
     parser.add_argument("--weights_dir", type=str, default='weights')
+    parser.add_argument("--plots_dir", type=str, default='plots')
     parser.add_argument('--tb_port', action="store", type=int, default=6006, help="tensorboard port")
 
     args = parser.parse_args()

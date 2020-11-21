@@ -5,6 +5,7 @@ import torch
 from tqdm import tqdm
 import os
 torch.autograd.set_detect_anomaly(True)
+from matplotlib import pyplot as plt
 
 class AdversarialTrainer(Trainer):
     """
@@ -30,6 +31,8 @@ class AdversarialTrainer(Trainer):
 
     def train(self, batch):
         generated_input, teacher_output = batch
+        self.plot_generated_input(generated_input)
+
         student_output = self.student(generated_input)
 
         generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
@@ -56,6 +59,15 @@ class AdversarialTrainer(Trainer):
         self.log(result)
         return result
 
+    def plot_generated_input(self, generated_input):
+        for g in self.test_dataset.gaussians:
+            plt.scatter(g.mean[0], g.mean[1])
+        plt.scatter(generated_input[:, 0].detach().cpu(), generated_input[:, 1].detach().cpu(), color='black')
+        plt.show(block=False)
+        plt.pause(1)
+        plt.savefig(os.path.join(self.c.plots_path, 'generated_iteration_{}'.format(self.iteration)))
+        plt.clf()
+
     def zero_grads(self):
         self.teacher.zero_grad()
         self.generator.zero_grad()
@@ -71,7 +83,7 @@ class AdversarialTrainer(Trainer):
         for epoch in range(self.c.tp.epochs):
             for ind, batch in enumerate(self.dataloader):
                 self.zero_grads()
-                if ind % self.c.tp.train_gen_every == 0:
+                if ind % self.c.tp.train_student_every != 0:
                     result = self.train(batch)
                     generator_loss = result['train/generator_loss']
                     generator_loss.backward()

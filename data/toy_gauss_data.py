@@ -14,6 +14,7 @@ class ToyGauss(Dataset):
         if not self.gaussians:
             self.init_gauss()
         self.gen_data()
+        print([g.mean for g in self.gaussians])
 
     def init_gauss(self):
         self.__class__.gaussians = []
