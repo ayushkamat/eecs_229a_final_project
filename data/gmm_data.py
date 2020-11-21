@@ -13,8 +13,10 @@ class GMMData(Dataset):
     """
 
     def __init__(self, dp, means=None, cov_mtxs=None, mode='train'):
+        torch.set_default_dtype(torch.float64)
         self.dp = dp
         self.gaussians = []
+        self.num_classes = self.dp.num_classes
         self.means = means
         self.cov_mtxs = cov_mtxs
         self.mode = mode
@@ -34,30 +36,33 @@ class GMMData(Dataset):
             else:
                 cov_mtx = cov_mtxs[ind]
             _cov_mtx.append(cov_mtx)
-            m = MultivariateNormal(mean.float(), cov_mtx)
+            m = MultivariateNormal(mean.double(), cov_mtx)
             self.gaussians.append(m)
         self.means = torch.stack(_means).to(self.dp.device)
         self.cov_mtxs = torch.stack(_cov_mtx).to(self.dp.device)
 
-    def copy(self, std=0):
+    def copy(self, std=0, rescale=True):
         means = copy.copy(self.means)
         cov_mtxs = copy.copy(self.cov_mtxs)
         if std > 0:
             for ind in range(len(means)):
                 means[ind] = means[ind] + torch.normal(torch.zeros(self.dp.gauss_dim), torch.tensor(std).to(self.dp.device))
+                
+        if rescale:
+            for ind in range(len(means)):
                 m = torch.rand((self.dp.gauss_dim, self.dp.gauss_dim))
                 cov_mtxs[ind] = m@m.T + 1e-1*torch.eye(self.dp.gauss_dim)
 
         return GMMData(self.dp, means, cov_mtxs, self.mode)
 
-    def sample(self, nsample):
+    def sample(self, nsample, class_index=-1):
         """
         Sample the underlying distribution
         """
         xs = []
         for _ in range(nsample):
-            rand_index = np.random.choice(np.arange(self.dp.num_classes))
-            gaussian = self.gaussians[rand_index]
+            idx = class_index if class_index >= 0 else np.random.choice(np.arange(self.dp.num_classes))
+            gaussian = self.gaussians[idx]
             xs.append(gaussian.sample())
         return torch.stack(xs).to(self.dp.device)
 
@@ -65,15 +70,15 @@ class GMMData(Dataset):
         """
         Compute likelihood of point x
         """
-        if len(x.shape) == 1:
-            probs = torch.stack([torch.exp(g.log_prob(x)) for g in self.gaussians]).to(self.dp.device)
-            return torch.log(torch.sum(probs) / self.dp.num_classes)
-
         out = []
+        xs = x if len(x.shape) == 2 else [x]
         for pt in x:
-            probs = torch.stack([torch.exp(g.log_prob(pt)) for g in self.gaussians]).to(self.dp.device)
+            log_probs = torch.stack([g.log_prob(pt) for g in self.gaussians]).to(self.dp.device)
+            probs = torch.exp(log_probs)
             out.append(torch.sum(probs) / self.dp.num_classes)
-        return torch.log(torch.stack(out).to(self.dp.device))
+        out = torch.log(torch.stack(out).to(self.dp.device))
+        if len(x.shape) == 1: out = out[0]
+        return out
 
     def __len__(self):
         return self.dp.num_samples

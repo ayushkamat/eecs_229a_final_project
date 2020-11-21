@@ -1,5 +1,4 @@
 from trainers.trainer import Trainer
-from pytorch_utils import empirical_kl
 
 from collections import defaultdict 
 from torch.utils.data import DataLoader
@@ -15,8 +14,14 @@ class DistanceTrainer(Trainer):
     """
     def __init__(self, config):
         super().__init__(config)
+
+        # KL Div here can have numerical issues, better with extra precision
+        torch.set_default_dtype(torch.float64)
         self.Nt = self.c.N_teachers
         self.Ns = self.c.N_students
+        self.dist_scale = self.c.dist_scale
+        self.dist_f = self.c.dist_f
+        self.dist_type = self.c.dist_type
         self.save_path = os.path.join(self.c.weights_path, 'distance.pkl')
 
     def train(self, model, batch, loss):
@@ -34,26 +39,28 @@ class DistanceTrainer(Trainer):
                 pred = model(x)
                 loss = self.c.tp.test_loss(pred, y)
                 result['test/loss'] += loss
-                result['test/acc'] += (torch.argmax(pred, dim=1) == y).float().mean()
+                result['test/acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
 
         for k in result:
             result[k] = result[k]/(i+1)
         return result
 
     def compare(self, teacher, student, teacher_data, student_data):
-        result = {'test/acc':0}
+        result = {'test/student_acc':0}
         dataloader = DataLoader(teacher_data, batch_size=self.c.dp.batch_size)
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 x,y = batch
                 pred = student(x)
                 loss = self.c.tp.test_loss(pred, y)
-                result['test/acc'] += (torch.argmax(pred, dim=1) == y).float().mean()
+                result['test/student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
         
         for k in result:
             result[k] = result[k]/(i+1)
 
-        result['kldiv'] = empirical_kl(teacher_data, student_data)
+        result[self.dist_type] = self.dist_f(teacher_data, student_data)
+        result['student/loc'] = student_data.means
+        result['teacher/loc'] = teacher_data.means
         return result
 
     def run(self):
@@ -82,10 +89,10 @@ class DistanceTrainer(Trainer):
             teacher_result = self.test(teacher, dataloader)
             teacher_acc = teacher_result['test/acc']
             pbar1.set_description("Teacher {} acc {:.2e}".format(n, teacher_acc))
-            pbar1.update(1)
 
             for m in range(self.Ns):
                 std = float(m) / self.Ns
+                std *= self.dist_scale
                 student_data = dataset.copy(std=std)
                 student_loader = DataLoader(student_data, batch_size=self.c.dp.batch_size)
                 student = self.c.student.model(self.c.student)
@@ -106,12 +113,18 @@ class DistanceTrainer(Trainer):
 
                 comp = self.compare(teacher, student, dataset, student_data)
                 comp['test/teacher_acc'] = teacher_acc
-                student_acc = comp['test/acc']
+                comp['teacher'] = n
+                comp['student'] = m
+                student_acc = comp['test/student_acc']
                 kldiv = comp['kldiv']
                 self.iteration += 1
                 pbar2.set_description("Teacher {} acc {:.2e} | Student {} acc {:.2e} | kl div {:.2e}".format(n, teacher_acc, m, student_acc, kldiv))
                 pbar2.update(1)
                 res.append(comp)
+                student.cpu()
 
                 with open(self.save_path, 'wb+') as f:
                     pickle.dump(res, f)
+
+            teacher.cpu()
+            pbar1.update(1)
