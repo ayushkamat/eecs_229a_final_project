@@ -1,4 +1,5 @@
 from trainers.trainer import Trainer
+from torch_utils import *
 
 from collections import defaultdict 
 from torch.utils.data import DataLoader
@@ -58,9 +59,12 @@ class DistanceTrainer(Trainer):
         for k in result:
             result[k] = result[k]/(i+1)
 
-        result[self.dist_type] = self.dist_f(teacher_data, student_data)
+        result[self.dist_type] = self.dist_f(teacher_data, student_data).cpu().detach().item()
+        result['kl_divergence'] = empirical_kl(teacher_data, student_data, nsamples=5*10**4).cpu().detach().item()
+        result['teacher_cond_entropy'] = empirical_posterior_entropy(teacher_data, teacher, nsamples=10**4).cpu().detach().item()
         result['student/loc'] = student_data.means
         result['teacher/loc'] = teacher_data.means
+        result['test/student_acc'] = result['test/student_acc'].cpu().detach().item()
         return result
 
     def run(self):
@@ -112,7 +116,7 @@ class DistanceTrainer(Trainer):
                         pbar3.update(self.c.dp.batch_size)
 
                 comp = self.compare(teacher, student, dataset, student_data)
-                comp['test/teacher_acc'] = teacher_acc
+                comp['test/teacher_acc'] = teacher_acc.cpu().detach().item()
                 comp['teacher'] = n
                 comp['student'] = m
                 student_acc = comp['test/student_acc']
