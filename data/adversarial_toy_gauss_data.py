@@ -14,6 +14,7 @@ class AdversarialToyGauss(Dataset):
         return self.dp.num_samples
 
     def __getitem__(self, idx):
-        generated_input = self.dp.generator() * 100
+        gen = self.dp.generator() # in range [0, 1]
+        generated_input =  gen * 100 + torch.randn(gen.shape) # scale and add randomness
         y = self.dp.teacher(generated_input)
         return generated_input.squeeze().to(self.dp.device), y.squeeze().to(self.dp.device)

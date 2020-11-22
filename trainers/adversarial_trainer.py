@@ -63,8 +63,8 @@ class AdversarialTrainer(Trainer):
         for g in self.test_dataset.gaussians:
             plt.scatter(g.mean[0], g.mean[1])
         plt.scatter(generated_input[:, 0].detach().cpu(), generated_input[:, 1].detach().cpu(), color='black')
-        plt.show(block=False)
-        plt.pause(1)
+        # plt.show(block=False)
+        # plt.pause(1)
         plt.savefig(os.path.join(self.c.plots_path, 'generated_iteration_{}'.format(self.iteration)))
         plt.clf()
 
