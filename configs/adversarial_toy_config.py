@@ -15,8 +15,10 @@ config.trainer = AdversarialTrainer
 config.tp.epochs = 16
 config.tp.log_train_every = 50
 config.tp.train_student_every = 25
-config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
-config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
+# config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
+# config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
+config.tp.generator_loss = lambda input, target: -nn.NLLLoss()(input, torch.argmax(target, dim=1))
+config.tp.student_loss = lambda input, target: nn.NLLLoss()(input, torch.argmax(target, dim=1))
 config.tp.test_loss = nn.NLLLoss() 
 config.tp.use_gpu = False
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
