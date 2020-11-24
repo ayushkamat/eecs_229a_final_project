@@ -47,30 +47,30 @@ class DistanceTrainer(Trainer):
         return result
 
     def compare(self, teacher, student, teacher_data, student_data):
-        result = {'test/student_acc':0}
+        result = {'student_acc':0}
         dataloader = DataLoader(teacher_data, batch_size=self.c.dp.batch_size)
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 x,y = batch
                 pred = student(x)
                 loss = self.c.tp.test_loss(pred, y)
-                result['test/student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
+                result['student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
         
         for k in result:
             result[k] = result[k]/(i+1)
 
-        result[self.dist_type] = self.dist_f(teacher_data, student_data).cpu().detach().item()
-        result['kl_divergence'] = empirical_kl(teacher_data, student_data, nsamples=5*10**4).cpu().detach().item()
-        result['teacher_cond_entropy'] = empirical_posterior_entropy(teacher_data, teacher, nsamples=10**4).cpu().detach().item()
-        result['student/loc'] = student_data.means
-        result['teacher/loc'] = teacher_data.means
-        result['test/student_acc'] = result['test/student_acc'].cpu().detach().item()
+        result['student_to_teacher_kl_divergence'] = empirical_kl(student_data, teacher_data, nsamples=10**4).cpu().detach().item()
+        result['teacher_to_student_kl_divergence'] = empirical_kl(teacher_data, student_data, nsamples=10**4).cpu().detach().item()
+        result['teacher_conditional_entropy'] = empirical_posterior_entropy(student_data, teacher, nsamples=10**4).cpu().detach().item()
+        result['student_loc'] = student_data.means.cpu().detach().numpy()
+        result['teacher_loc'] = teacher_data.means.cpu().detach().numpy()
+        result['student_acc'] = result['student_acc'].cpu().detach().item()
         return result
 
     def run(self):
         res = []
-        pbar1 = tqdm(total=self.Nt, position=0, leave=True)
-        pbar2 = tqdm(total=self.Ns*self.Nt, position=1, leave=True)
+        pbar1 = tqdm(total=self.Nt, position=2, leave=True)
+        pbar2 = tqdm(total=self.Ns*self.Nt, position=3, leave=True)
         pbar1.set_description("Teacher first run...")
         pbar2.set_description("Student not run...")
         
@@ -81,7 +81,7 @@ class DistanceTrainer(Trainer):
             dataloader = DataLoader(dataset, batch_size=self.c.dp.batch_size)
             teacher = self.c.teacher.model(self.c.teacher)
             teacher_opt = self.c.opt(teacher.parameters(), lr = self.c.op.lr)
-            pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=2, leave=False)
+            pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=4, leave=False)
             for epoch in range(self.c.tp.epochs):
                 for ind, batch in enumerate(dataloader):
                     teacher_opt.zero_grad()
@@ -92,6 +92,7 @@ class DistanceTrainer(Trainer):
                     pbar3.update(self.c.dp.batch_size)
             teacher_result = self.test(teacher, dataloader)
             teacher_acc = teacher_result['test/acc']
+            teacher_cond_entr = empirical_posterior_entropy(teacher_data, teacher_data, nsamples=10**4).cpu().detach().item()
             pbar1.set_description("Teacher {} acc {:.2e}".format(n, teacher_acc))
 
             for m in range(self.Ns):
@@ -101,7 +102,7 @@ class DistanceTrainer(Trainer):
                 student_loader = DataLoader(student_data, batch_size=self.c.dp.batch_size)
                 student = self.c.student.model(self.c.student)
                 student_opt = self.c.opt(student.parameters(), lr = self.c.op.lr)
-                pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=2, leave=False)
+                pbar3 = tqdm(total=self.c.tp.epochs*self.c.dp.num_samples, position=4, leave=False)
                 pbar3.update(1)
                 for epoch in range(self.c.tp.epochs):
                     for ind, batch in enumerate(student_loader):
@@ -116,11 +117,12 @@ class DistanceTrainer(Trainer):
                         pbar3.update(self.c.dp.batch_size)
 
                 comp = self.compare(teacher, student, dataset, student_data)
-                comp['test/teacher_acc'] = teacher_acc.cpu().detach().item()
+                comp['teacher_acc'] = teacher_acc.cpu().detach().item()
                 comp['teacher'] = n
                 comp['student'] = m
-                student_acc = comp['test/student_acc']
-                kldiv = comp['kldiv']
+                comp['true_teacher_cond_entropy'] = teacher_cond_entr
+                student_acc = comp['student_acc']
+                kldiv = comp['student_to_teacher_kl_divergence']
                 self.iteration += 1
                 pbar2.set_description("Teacher {} acc {:.2e} | Student {} acc {:.2e} | kl div {:.2e}".format(n, teacher_acc, m, student_acc, kldiv))
                 pbar2.update(1)
