@@ -40,19 +40,37 @@ class GenerativeTrainer(Trainer):
 
         # return result
 
-        label = batch # y
-        generated_image = self.generator(label) # x
+        # label = batch # y
+        # generated_image = self.generator(label) # x
 
-        teacher_label = self.teacher(generated_image)
-        student_label = self.student(generated_image)
+        # teacher_label = self.teacher(generated_image)
+        # student_label = self.student(generated_image)
 
-        gen_loss = 0.5 * (self.c.tp.generator_loss(teacher_label, label) + self.c.tp.generator_loss(label, teacher_label)) 
-        stu_loss = self.c.tp.student_loss(student_label, teacher_label.detach())
+        # gen_loss = 0.5 * (self.c.tp.generator_loss(teacher_label, label) + self.c.tp.generator_loss(label, teacher_label)) 
+        # stu_loss = self.c.tp.student_loss(student_label, teacher_label.detach())
 
-        result = {'train/generator_loss': gen_loss, 'train/student_loss': stu_loss}
+        # result = {'train/generator_loss': gen_loss, 'train/student_loss': stu_loss}
+
+        # return result
+
+
+        data, labels = batch
+        labels = labels.reshape(-1, 1).float()
+        means, sigmas = self.generator(labels)
+        dim = means.shape
+        epsilon = torch.randn(self.c.generator.num_samples, *dim)
+        generated_outputs = epsilon * sigmas + means
+
+        teacher_labels = self.teacher(generated_outputs)
+        student_labels = self.student(generated_outputs)
+
+        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_labels, labels) + self.c.tp.generator_loss(labels, teacher_labels)) + 0.1 * torch.exp(-self.c.tp.entropy_loss(means, sigmas))
+        student_loss = -torch.log(self.c.tp.student_loss(student_labels, teacher_labels)) # train student to match teacher
+
+        result = {'train/generator_loss' : generator_loss,
+                  'train/student_loss'   : student_loss}
 
         return result
-
 
 
 
@@ -72,18 +90,41 @@ class GenerativeTrainer(Trainer):
         # self.log(result)
         # return result
 
+        # result = defaultdict(lambda: 0)
+        # with torch.no_grad():
+        #     for i, batch in enumerate(self.test_dataloader):
+        #         x, y = batch
+        #         gen_x = self.generator(y)
+        #         pred_student = self.student(gen_x)
+        #         pred_teacher = self.teacher(gen_x)
+        #         loss = self.c.tp.test_loss(pred_student, pred_teacher)
+        #         result['test/loss'] += loss
+
+        # for k in result:
+        #     result[k] = result[k] / (i+1)
+
+        # self.log(result)
+        # return result
+
         result = defaultdict(lambda: 0)
         with torch.no_grad():
             for i, batch in enumerate(self.test_dataloader):
-                x, y = batch
-                gen_x = self.generator(y)
-                pred_student = self.student(gen_x)
-                pred_teacher = self.teacher(gen_x)
-                loss = self.c.tp.test_loss(pred_student, pred_teacher)
+                data, labels = batch
+                labels = labels.reshape(-1, 1).float()
+                means, sigmas = self.generator(labels)
+                dim = means.shape
+                epsilon = torch.randn(*dim)
+                generated_outputs = epsilon * sigmas + means
+
+                student_predictions = self.student(generated_outputs)
+                teacher_predictions = self.teacher(generated_outputs)
+
+                loss = self.c.tp.test_loss(student_predictions, teacher_predictions)
                 result['test/loss'] += loss
+                result['test/acc']  += (torch.argmax(student_predictions, dim=1) == torch.argmax(teacher_predictions, dim=1)).float().mean()
 
         for k in result:
-            result[k] = result[k] / (i+1)
+            result[k] = result[k] / (i + 1)
 
         self.log(result)
         return result
@@ -95,17 +136,19 @@ class GenerativeTrainer(Trainer):
         self.generator.zero_grad()
         self.student.zero_grad()
 
+
+
     def run(self):
         self.total_iterations = len(self.dataloader)*self.c.tp.epochs
-        pbar = tqdm(total=self.total_iterations)
+        progress_bar = tqdm(total=self.total_iterations)
         
         self.test()
         generator_loss = torch.tensor(0)
         student_loss = torch.tensor(0)
         for epoch in range(self.c.tp.epochs):
-            for ind, batch in enumerate(self.dataloader):
+            for index, batch in enumerate(self.dataloader):
                 self.zero_grads()
-                if ind % self.c.tp.train_gen_every == 0:
+                if index % self.c.tp.train_gen_every != 0:
                     result = self.train(batch)
                     generator_loss = result['train/generator_loss']
                     generator_loss.backward()
@@ -119,11 +162,13 @@ class GenerativeTrainer(Trainer):
                 if self.iteration % self.c.tp.log_train_every == 0:
                     self.log(result)
                 self.iteration += 1
-                pbar.set_description("Epoch {}/{} | Gen Loss {:.2e} Student Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item(), student_loss.item()))
-                pbar.update(1)
+                progress_bar.set_description("Epoch {}/{} | Gen Loss {:.2e} Student Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item(), student_loss.item()))
+                progress_bar.update(1)
             self.test()
 
         self.save()
+
+
     
     def save(self):
         torch.save(self.generator.state_dict(), os.path.join(self.c.weights_path, '{}.pth'.format('generator')))

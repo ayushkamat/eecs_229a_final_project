@@ -1,51 +1,56 @@
 from dotmap import DotMap
 from trainers.adversarial_trainer import AdversarialTrainer
+from trainers.generative_trainer import GenerativeTrainer
 from data.adversarial_toy_gauss_data import AdversarialToyGauss
 from data.toy_gauss_data import ToyGauss
 from models.mlp import mlp
 from models.generator import generator
-from torch import nn
+from models.generative_approach_generator import GenerativeGenerator
+from torch import nn, distributions
 from torch.optim import Adam
 import torch
 
 config = DotMap()
 config.seed = 1
 
-config.trainer = AdversarialTrainer
-config.tp.epochs = 16
+config.trainer = GenerativeTrainer
+config.tp.epochs = 64
 config.tp.log_train_every = 50
-config.tp.train_gen_every = 2
-config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
-config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
-config.tp.test_loss = nn.NLLLoss() 
+config.tp.train_gen_every = 16
+config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(reduction='batchmean', log_target=True)(input, target)
+config.tp.student_loss = nn.MSELoss()
+config.tp.entropy_loss = lambda mean, sigma: torch.norm(sigma)# torch.norm(distributions.kl.kl_divergence(distributions.normal.Normal(mean, sigma), 
+																					   # distributions.uniform.Uniform(torch.empty(*mean.shape).fill_(config.dp.min_val), 
+																												     # torch.empty(*mean.shape).fill_(config.dp.max_val))))
+config.tp.test_loss = nn.MSELoss() 
 config.tp.use_gpu = False
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
 
 config.opt = Adam
-config.op.lr = 1e-3
+config.op.lr = 1e-4
 
-config.dataset = AdversarialToyGauss
+config.dataset = ToyGauss
+config.dp.min_val = -10
+config.dp.max_val = 10
 config.dp.device = config.tp.device
 config.dp.seed = config.seed
-config.dp.gauss_dim = 3
-config.dp.num_classes = 3
+config.dp.gauss_dim = 100
+config.dp.num_classes = 2
 config.dp.batch_size = 128
 config.dp.num_samples = 100000
 
 config.test_dataset = ToyGauss
 config.tdp.device = config.tp.device
 config.tdp.seed = config.seed
-config.tdp.gauss_dim = 3
-config.tdp.num_classes = 3
+config.tdp.gauss_dim = 100
+config.tdp.num_classes = 2
 config.tdp.batch_size = 128
 config.tdp.num_samples = 1000
 
-config.generator.model = generator
+config.generator.model = GenerativeGenerator
 config.generator.device = config.tp.device
-config.generator.noise_dim = 100
-config.generator.noise_mean = 0
-config.generator.noise_std = 1
-config.generator.input_size = config.generator.noise_dim
+config.generator.num_samples = 100
+config.generator.input_size = 1
 config.generator.hidden_sizes = [8, 32, 16]
 config.generator.output_size = config.dp.gauss_dim
 config.generator.activation = nn.ReLU()
@@ -53,7 +58,7 @@ config.generator.output_activation= nn.Identity()
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device
-config.teacher.checkpoint = 'logs/toy_config@1605515479/weights/model.pth'
+config.teacher.checkpoint = 'logs/toy_config@1606389164/weights/model.pth'
 config.teacher.input_size = config.dp.gauss_dim
 config.teacher.hidden_sizes = [8, 32, 16]
 config.teacher.output_size = config.dp.num_classes

@@ -23,16 +23,16 @@ config.op.lr = 1e-3
 config.dataset = ToyGauss
 config.dp.device = config.tp.device
 config.dp.seed = 1 # seed must match between test and train in order to use same underlying gaussians
-config.dp.gauss_dim = 3
-config.dp.num_classes = 3
+config.dp.gauss_dim = 100
+config.dp.num_classes = 2
 config.dp.batch_size = 128
 config.dp.num_samples = 100000
 
 config.test_dataset = ToyGauss
 config.tdp.device = config.tp.device
 config.tdp.seed = 1
-config.tdp.gauss_dim = 3
-config.tdp.num_classes = 3
+config.tdp.gauss_dim = 100
+config.tdp.num_classes = 2
 config.tdp.batch_size = 128
 config.tdp.num_samples = 1000
 
