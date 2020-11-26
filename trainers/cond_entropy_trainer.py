@@ -55,7 +55,7 @@ class CondEntropyTrainer(Trainer):
                 distr = data
                 break
 
-        result['teacher/loc'] = teacher_data.means
+        result['teacher/loc'] = teacher_data.means.cpu().detach().numpy()
         result['kldiv'] = empirical_kl(teacher_data, distr).cpu().detach().item() if distr is not teacher_data else 0
         return result
 

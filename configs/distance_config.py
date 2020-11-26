@@ -3,7 +3,7 @@ from torch import nn
 from torch.optim import Adam
 import torch
 
-from pytorch_utils import empirical_kl
+from torch_utils import empirical_kl
 from trainers.distance_trainer import DistanceTrainer
 from data.gmm_data import GMMData, GMMTeacherData
 from models.mlp import mlp
@@ -25,16 +25,16 @@ config.opt = Adam
 config.op.lr = 1e-3
 
 config.N_teachers = 50
-config.N_students = 10
+config.N_students = 5
 config.dist_f = empirical_kl
-config.dist_scale = 2.5
+config.dist_scale = 3
 config.dist_type = 'kldiv'
 
 config.dataset = GMMData
 config.dp.device = config.tp.device
 config.dp.seed = config.seed
-config.dp.gauss_dim = 4
-config.dp.num_classes = 4
+config.dp.gauss_dim = 3
+config.dp.num_classes = 5
 config.dp.batch_size = 128
 config.dp.num_samples = 50000
 config.dp.prior = None
