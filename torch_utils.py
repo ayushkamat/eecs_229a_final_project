@@ -13,7 +13,7 @@ def empirical_kl(distr_p, distr_q, nsamples=10**3):
     return mean / n_batches
 
 def empirical_entropy(tensor):
-    return Categorical(probs=tensor).entropy()
+    return Categorical(probs=tensor.float()).entropy()
 
 def empirical_posterior_entropy(distr_p,  model, nsamples=10**3):
     ent = 0
