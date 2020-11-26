@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 from torch.distributions.multivariate_normal import MultivariateNormal
 import numpy as np
 import torch
+import torch.distributions as D
 
 
 class ToyGauss(Dataset):
@@ -15,6 +16,7 @@ class ToyGauss(Dataset):
             self.init_gauss()
         self.gen_data()
         print([g.mean for g in self.gaussians])
+        self.input_prior = D.MultivariateNormal(torch.ones(self.dp.gauss_dim,)*50, torch.eye(self.dp.gauss_dim,)*50)
 
     def init_gauss(self):
         self.__class__.gaussians = []

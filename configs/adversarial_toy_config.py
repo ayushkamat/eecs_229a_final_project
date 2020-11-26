@@ -12,13 +12,11 @@ config = DotMap()
 config.seed = 1
 
 config.trainer = AdversarialTrainer
-config.tp.epochs = 16
+config.tp.epochs = 64
 config.tp.log_train_every = 50
 config.tp.train_student_every = 25
-# config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
-# config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
-config.tp.generator_loss = lambda input, target: -nn.NLLLoss()(input, torch.argmax(target, dim=1))
-config.tp.student_loss = lambda input, target: nn.NLLLoss()(input, torch.argmax(target, dim=1))
+config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
+config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
 config.tp.test_loss = nn.NLLLoss() 
 config.tp.use_gpu = False
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
@@ -47,11 +45,12 @@ config.generator.device = config.tp.device
 config.generator.noise_dim = 2
 config.generator.noise_mean = 0
 config.generator.noise_std = 1
+config.generator.gauss_dim = 2
 config.generator.input_size = config.generator.noise_dim
 config.generator.hidden_sizes = [4, 8, 4]
-config.generator.output_size = config.dp.gauss_dim
+config.generator.output_size = config.dp.gauss_dim + config.dp.gauss_dim**2 # means and cov mtx
 config.generator.activation = nn.ReLU()
-config.generator.output_activation= nn.Sigmoid()
+config.generator.output_activation= nn.Identity()
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device

@@ -6,6 +6,7 @@ from tqdm import tqdm
 import os
 torch.autograd.set_detect_anomaly(True)
 from matplotlib import pyplot as plt
+import torch.distributions as D
 
 class AdversarialTrainer(Trainer):
     """
@@ -30,16 +31,24 @@ class AdversarialTrainer(Trainer):
         self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
 
     def train(self, batch):
-        generated_input, teacher_output = batch
+        gaussian_means, gaussian_stds = batch
+        generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
+        generated_input = generated_distribution.rsample((self.c.dp.batch_size,))
+        teacher_output = self.teacher(generated_input)
         self.plot_generated_input(generated_input)
 
         student_output = self.student(generated_input)
 
-        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
+        negative_disagreement = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
+        kl_constraint = torch.distributions.kl_divergence(generated_distribution, self.test_dataset.input_prior).mean()
+        generator_loss = negative_disagreement + kl_constraint
         student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
         result = {'train/student_loss': student_loss,
-                  'train/generator_loss': generator_loss}
+                  'train/generator_loss': generator_loss,
+                  'train/negative_disagreement_loss': negative_disagreement,
+                  'train/kl_constraint_loss': kl_constraint,
+                  }
 
         return result
 
