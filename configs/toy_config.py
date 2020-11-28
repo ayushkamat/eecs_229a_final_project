@@ -31,8 +31,8 @@ config.dp.num_samples = 100000
 config.test_dataset = ToyGauss
 config.tdp.device = config.tp.device
 config.tdp.seed = 1
-config.tdp.gauss_dim = 3
-config.tdp.num_classes = 3
+config.tdp.gauss_dim = 100
+config.tdp.num_classes = 2
 config.tdp.batch_size = 128
 config.tdp.num_samples = 1000
 
