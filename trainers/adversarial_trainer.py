@@ -35,13 +35,12 @@ class AdversarialTrainer(Trainer):
         generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
         generated_input = generated_distribution.rsample((self.c.dp.batch_size,))
         teacher_output = self.teacher(generated_input)
-        self.plot_generated_input(generated_input)
+        # self.plot_generated_input(generated_input)
 
         student_output = self.student(generated_input)
-
         negative_disagreement = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
         kl_constraint = torch.distributions.kl_divergence(generated_distribution, self.test_dataset.input_prior).mean()
-        generator_loss = negative_disagreement + kl_constraint
+        generator_loss = self.c.tp.negative_disagreement_weight * negative_disagreement + self.c.tp.kl_constraint_weight * kl_constraint
         student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
         result = {'train/student_loss': student_loss,
@@ -69,11 +68,11 @@ class AdversarialTrainer(Trainer):
         return result
 
     def plot_generated_input(self, generated_input):
+        """ Plots the first two dimensions of the generated input as well as the means of the test data gaussians """
+
         for g in self.test_dataset.gaussians:
             plt.scatter(g.mean[0], g.mean[1])
         plt.scatter(generated_input[:, 0].detach().cpu(), generated_input[:, 1].detach().cpu(), color='black')
-        # plt.show(block=False)
-        # plt.pause(1)
         plt.savefig(os.path.join(self.c.plots_path, 'generated_iteration_{}'.format(self.iteration)))
         plt.clf()
 
