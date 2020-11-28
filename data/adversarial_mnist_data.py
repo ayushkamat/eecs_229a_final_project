@@ -3,13 +3,13 @@ from torchvision.datasets.mnist import MNIST
 import torchvision.transforms as transforms
 import numpy as np
 import torch
-import torch.distributions as D
 
-class MNISTData(MNIST):
-    """Mnist Dataset wrapper"""
+class AdversarialMNISTData(MNIST):
+    """Adversarial MNIST dataset: X is a generated input, Y is the output from the teacher applied to X. Y is generated on the fly in the trainer.py"""
 
     def __init__(self, dp, mode='train'):
         self.dp = dp
+        torch.manual_seed(dp.seed)
         resolution = dp.resolution or (28, 28)
         directory = dp.dir or './cache/mnist'
         classes = dp.classes
@@ -27,8 +27,6 @@ class MNISTData(MNIST):
         # filter classes and flatten data
         # classes are reindexed using dp.classes as a map
         self.clean_data(classes)
-
-        self.input_prior = D.MultivariateNormal(torch.zeros(resolution[0]*resolution[1],).to(self.dp.device), torch.eye(resolution[0]*resolution[1],).to(self.dp.device))
         
     def clean_data(self, classes):
         if classes and len(classes) < 10:
@@ -45,7 +43,5 @@ class MNISTData(MNIST):
         return len(self.data)
 
     def __getitem__(self, idx):
-        x, y = super().__getitem__(idx)
-        # flatten and normalize data
-        x_flattened = x.flatten()
-        return x_flattened.to(self.dp.device), torch.tensor(y).to(self.dp.device)
+        gen_mean, gen_std = self.dp.generator()
+        return gen_mean.to(self.dp.device), gen_std.to(self.dp.device)
