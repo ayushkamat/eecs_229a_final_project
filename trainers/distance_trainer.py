@@ -92,7 +92,7 @@ class DistanceTrainer(Trainer):
                     pbar3.update(self.c.dp.batch_size)
             teacher_result = self.test(teacher, dataloader)
             teacher_acc = teacher_result['test/acc']
-            teacher_cond_entr = empirical_posterior_entropy(teacher_data, teacher_data, nsamples=10**4).cpu().detach().item()
+            teacher_cond_entr = empirical_posterior_entropy(dataset, teacher, nsamples=10**4).cpu().detach().item()
             pbar1.set_description("Teacher {} acc {:.2e}".format(n, teacher_acc))
 
             for m in range(self.Ns):
