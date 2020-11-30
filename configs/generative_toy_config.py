@@ -18,7 +18,7 @@ config.tp.epochs = 64
 config.tp.log_train_every = 10
 config.tp.train_gen_every = 16
 config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(reduction='batchmean', log_target=True)(input, target)
-config.tp.student_loss = nn.MSELoss()
+config.tp.student_loss = nn.NLLLoss()
 config.tp.entropy_loss = lambda mean, sigma: torch.norm(sigma)# torch.norm(distributions.kl.kl_divergence(distributions.normal.Normal(mean, sigma), 
 																					   # distributions.uniform.Uniform(torch.empty(*mean.shape).fill_(config.dp.min_val), 
 																												     # torch.empty(*mean.shape).fill_(config.dp.max_val))))
@@ -34,16 +34,16 @@ config.dp.min_val = -10
 config.dp.max_val = 10
 config.dp.device = config.tp.device
 config.dp.seed = config.seed
-config.dp.gauss_dim = 100
-config.dp.num_classes = 2
+config.dp.gauss_dim = 2
+config.dp.num_classes = 3
 config.dp.batch_size = 128
 config.dp.num_samples = 100
 
 config.test_dataset = ToyGauss
 config.tdp.device = config.tp.device
 config.tdp.seed = config.seed
-config.tdp.gauss_dim = 100
-config.tdp.num_classes = 2
+config.tdp.gauss_dim = 2
+config.tdp.num_classes = 3
 config.tdp.batch_size = 128
 config.tdp.num_samples = 1000
 

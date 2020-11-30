@@ -5,8 +5,6 @@ import torch
 from tqdm import tqdm
 import os
 torch.autograd.set_detect_anomaly(True)
-from matplotlib import pyplot as plt
-import torch.distributions as D
 
 class AdversarialTrainer(Trainer):
     """
@@ -31,23 +29,14 @@ class AdversarialTrainer(Trainer):
         self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
 
     def train(self, batch):
-        gaussian_means, gaussian_stds = batch
-        generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
-        generated_input = generated_distribution.rsample((self.c.dp.batch_size,))
-        teacher_output = self.teacher(generated_input)
-        # self.plot_generated_input(generated_input)
-
+        generated_input, teacher_output = batch
         student_output = self.student(generated_input)
-        negative_disagreement = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
-        kl_constraint = torch.distributions.kl_divergence(generated_distribution, self.test_dataset.input_prior).mean()
-        generator_loss = self.c.tp.negative_disagreement_weight * negative_disagreement + self.c.tp.kl_constraint_weight * kl_constraint
+
+        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
         student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
         result = {'train/student_loss': student_loss,
-                  'train/generator_loss': generator_loss,
-                  'train/negative_disagreement_loss': negative_disagreement,
-                  'train/kl_constraint_loss': kl_constraint,
-                  }
+                  'train/generator_loss': generator_loss}
 
         return result
 
@@ -67,15 +56,6 @@ class AdversarialTrainer(Trainer):
         self.log(result)
         return result
 
-    def plot_generated_input(self, generated_input):
-        """ Plots the first two dimensions of the generated input as well as the means of the test data gaussians """
-
-        for g in self.test_dataset.gaussians:
-            plt.scatter(g.mean[0], g.mean[1])
-        plt.scatter(generated_input[:, 0].detach().cpu(), generated_input[:, 1].detach().cpu(), color='black')
-        plt.savefig(os.path.join(self.c.plots_path, 'generated_iteration_{}'.format(self.iteration)))
-        plt.clf()
-
     def zero_grads(self):
         self.teacher.zero_grad()
         self.generator.zero_grad()
@@ -91,7 +71,7 @@ class AdversarialTrainer(Trainer):
         for epoch in range(self.c.tp.epochs):
             for ind, batch in enumerate(self.dataloader):
                 self.zero_grads()
-                if ind % self.c.tp.train_student_every != 0:
+                if ind % self.c.tp.train_gen_every == 0:
                     result = self.train(batch)
                     generator_loss = result['train/generator_loss']
                     generator_loss.backward()

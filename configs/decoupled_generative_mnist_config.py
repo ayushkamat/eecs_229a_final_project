@@ -16,19 +16,17 @@ config = DotMap()
 config.seed = 1
 
 config.trainer = DecoupledGenerativeTrainer
-config.tp.gen_epochs = 12
+config.tp.gen_epochs = 1
 config.tp.stu_epochs = 48
 config.tp.log_train_every = 10
 config.tp.train_gen_every = 12
-config.tp.generator_loss = nn.MSELoss() # nn.KLDivLoss(reduction='batchmean', log_target=True)
-config.tp.student_loss = nn.L1Loss()
-config.tp.entropy_loss = lambda mean, sigma: torch.norm(sigma)# torch.norm(distributions.kl.kl_divergence(distributions.normal.Normal(mean, sigma), 
-							
-
-																					   # distributions.uniform.Uniform(torch.empty(*mean.shape).fill_(config.dp.min_val), 
-																												     # torch.empty(*mean.shape).fill_(config.dp.max_val))))
+config.tp.generator_loss = nn.KLDivLoss(reduction='batchmean', log_target=True)
+config.tp.student_loss = nn.NLLLoss()
+config.tp.entropy_loss = lambda mean, sigma: torch.norm(sigma) # torch.norm(distributions.kl.kl_divergence(distributions.normal.Normal(mean, sigma), 
+																					                     # distributions.uniform.Uniform(torch.empty(*mean.shape).fill_(config.dp.min_val), 
+																										               		           # torch.empty(*mean.shape).fill_(config.dp.max_val))))
 config.tp.test_loss = lambda input, target: torch.log(nn.MSELoss()(input, target))
-config.tp.use_gpu = True
+config.tp.use_gpu = False
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
 
 config.opt = Adam
@@ -41,7 +39,7 @@ config.dp.classes = [0, 1, 2, 3, 4, 5]
 config.dp.resolution = (28, 28)
 config.dp.dir = "./data/cache/mnist"
 config.dp.num_classes = 6
-config.dp.batch_size = 256
+config.dp.batch_size = 128
 config.dp.num_samples = 10000
 
 # config.dataset = MNISTData
