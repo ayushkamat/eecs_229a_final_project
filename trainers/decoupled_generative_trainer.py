@@ -19,6 +19,9 @@ class DecoupledGenerativeTrainer(Trainer):
         self.teacher = self.c.teacher.model(self.c.teacher)
         self.student = self.c.student.model(self.c.student)
         self.generator = self.c.generator.model(self.c.generator)
+        self.load_gen = self.c.generator.load_gen
+        if self.c.generator.load_gen:
+            self.generator.load_state_dict(torch.load(self.c.generator.checkpoint))
         self.teacher.load_state_dict(torch.load(self.c.teacher.checkpoint))
         self.c.dp.teacher = self.teacher
         self.c.dp.generator = self.generator
@@ -30,35 +33,16 @@ class DecoupledGenerativeTrainer(Trainer):
         self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
         self.num_classes = self.c.dp.num_classes
         self.student_loss = 0
+        self.student_acc = 0
+        self.teacher_acc = 0
+        self.true_student_acc = 0
         self.kl_constraint = 0
         self.coherence = 0
-        self.student_loss = 0
+        self.generator_loss = 0
 
     def train(self, batch, train_gen=True):
-
-        # gaussian_means, gaussian_stds = batch
-        # generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
-        # generated_input = generated_distribution.rsample((self.c.dp.batch_size,))
-        # teacher_output = self.teacher(generated_input)
-        # # self.plot_generated_input(generated_input)
-
-        # student_output = self.student(generated_input)
-        # negative_disagreement = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
-        # kl_constraint = torch.distributions.kl_divergence(generated_distribution, self.test_dataset.input_prior).mean()
-        # generator_loss = self.c.tp.negative_disagreement_weight * negative_disagreement + self.c.tp.kl_constraint_weight * kl_constraint
-        # student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
-
-        # result = {'train/student_loss': student_loss,
-        #           'train/generator_loss': generator_loss,
-        #           'train/negative_disagreement_loss': negative_disagreement,
-        #           'train/kl_constraint_loss': kl_constraint,
-        #           }
-
-        # return result
-
         data, labels = batch
         labels_oh = torch.nn.functional.one_hot(labels).float()
-        labels = labels.float()
         means, sigmas = self.generator(labels_oh)
         sigmas = torch.abs(sigmas) # ensure absolute values
         dim = means.shape
@@ -68,18 +52,24 @@ class DecoupledGenerativeTrainer(Trainer):
         teacher_labels = self.teacher(generated_outputs).float()
         student_labels = self.student(generated_outputs).float()
 
-        generated_dist = D.MultivariateNormal(means, torch.diag_embed(sigmas))
-
-        if train_gen:
+        if train_gen: # don't compute generator loss when training student for speed
+            generated_dist = D.MultivariateNormal(means, torch.diag_embed(sigmas))
             self.coherence = 0.5 * (self.c.tp.generator_loss(teacher_labels, labels_oh) + self.c.tp.generator_loss(labels_oh, teacher_labels))
             self.kl_constraint = D.kl_divergence(generated_dist, self.test_dataset.input_prior).mean()
-            self.generator_loss = self.coherence + self.kl_constraint
+            self.generator_loss = self.coherence + 10 * self.kl_constraint
         self.student_loss = self.c.tp.student_loss(input=student_labels, target=torch.argmax(teacher_labels, dim=1)) # train student to match teacher
+        self.student_acc = (torch.argmax(teacher_labels, dim=1) == torch.argmax(student_labels, dim=1)).float().mean()
+        self.teacher_acc = (torch.argmax(teacher_labels, dim=1) == labels).float().mean()
+        self.true_student_acc = (torch.argmax(student_labels, dim=1) == labels).float().mean()
 
-        result = {'train/student_loss'   : self.student_loss, 
-                  'train/generator_loss' : self.generator_loss,
-                  'train/coherence'      : self.coherence,
-                  'train/kl_constraint'  : self.kl_constraint}
+
+        result = {'train/student_loss'     : self.student_loss, 
+                  'train/generator_loss'   : self.generator_loss,
+                  'train/coherence'        : self.coherence,
+                  'train/kl_constraint'    : self.kl_constraint,
+                  'train/teacher_acc'      : self.teacher_acc,
+                  'train/student_acc'      : self.student_acc,
+                  'train/true_student_acc' : self.true_student_acc}
 
         return result
 
@@ -88,15 +78,15 @@ class DecoupledGenerativeTrainer(Trainer):
         with torch.no_grad():
             for i, batch in enumerate(self.test_dataloader):
                 data, labels = batch
-                labels_oh = torch.nn.functional.one_hot(labels).float()
-                labels = labels.view(-1, 1).float()
 
                 student_predictions = torch.argmax(self.student(data), dim=1)
                 teacher_predictions = torch.argmax(self.teacher(data), dim=1)
 
                 loss = self.c.tp.test_loss(student_predictions.float(), teacher_predictions.float())
                 result['test/loss'] += loss
-                result['test/acc']  += (student_predictions == teacher_predictions).float().mean()
+                result['test/teacher_student_acc']  += (student_predictions == teacher_predictions).float().mean()
+                result['test/student_acc'] += (student_predictions == labels).float().mean()
+                result['test/teacher_acc'] += (teacher_predictions == labels).float().mean()
 
         for k in result:
             result[k] = result[k] / (i + 1)
@@ -114,25 +104,25 @@ class DecoupledGenerativeTrainer(Trainer):
 
 
     def run(self):
-        self.total_iterations = len(self.dataloader)*self.c.tp.gen_epochs
-        progress_bar = tqdm(total=self.total_iterations)
-        
         self.test()
-        generator_loss = torch.tensor(0)
-        student_loss = torch.tensor(0)
-        for epoch in range(self.c.tp.gen_epochs):
-            for index, batch in enumerate(self.dataloader):
-                self.zero_grads()
-                result = self.train(batch)
-                generator_loss = result['train/generator_loss']
-                generator_loss.backward()
-                self.gen_opt.step()
+        if not self.load_gen:
+            self.total_iterations = len(self.dataloader)*self.c.tp.gen_epochs
+            progress_bar = tqdm(total=self.total_iterations)
+            generator_loss = torch.tensor(0)
+            student_loss = torch.tensor(0)
+            for epoch in range(self.c.tp.gen_epochs):
+                for index, batch in enumerate(self.dataloader):
+                    self.zero_grads()
+                    result = self.train(batch)
+                    generator_loss = result['train/generator_loss']
+                    generator_loss.backward()
+                    self.gen_opt.step()
 
-                if self.iteration % self.c.tp.log_train_every == 0:
-                    self.log(result)
-                self.iteration += 1
-                progress_bar.set_description("Epoch {}/{} | Gen Loss {:.2e}".format(epoch+1, self.c.tp.gen_epochs, generator_loss.item()))
-                progress_bar.update(1)
+                    if self.iteration % self.c.tp.log_train_every == 0:
+                        self.log(result)
+                    self.iteration += 1
+                    progress_bar.set_description("Epoch {}/{} | Gen Loss {:.2e}".format(epoch+1, self.c.tp.gen_epochs, generator_loss.item()))
+                    progress_bar.update(1)
 
 
         self.total_iterations = len(self.dataloader)*self.c.tp.stu_epochs

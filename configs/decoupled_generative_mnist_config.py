@@ -16,10 +16,9 @@ config = DotMap()
 config.seed = 1
 
 config.trainer = DecoupledGenerativeTrainer
-config.tp.gen_epochs = 1
+config.tp.gen_epochs = 4
 config.tp.stu_epochs = 48
-config.tp.log_train_every = 10
-config.tp.train_gen_every = 12
+config.tp.log_train_every = 1
 config.tp.generator_loss = nn.KLDivLoss(reduction='batchmean', log_target=True)
 config.tp.student_loss = nn.NLLLoss()
 config.tp.entropy_loss = lambda mean, sigma: torch.norm(sigma) # torch.norm(distributions.kl.kl_divergence(distributions.normal.Normal(mean, sigma), 
@@ -39,7 +38,7 @@ config.dp.classes = [0, 1, 2, 3, 4, 5]
 config.dp.resolution = (28, 28)
 config.dp.dir = "./data/cache/mnist"
 config.dp.num_classes = 6
-config.dp.batch_size = 128
+config.dp.batch_size = 512
 config.dp.num_samples = 10000
 
 # config.dataset = MNISTData
@@ -70,6 +69,8 @@ config.tdp.batch_size = 256
 
 config.generator.model = GenerativeGenerator
 config.generator.device = config.tp.device
+config.generator.load_gen = False
+config.generator.checkpoint = 'logs/decoupled_generative_mnist_config@1606783641/weights/generator.pth'
 config.generator.num_samples = 100
 config.generator.input_size = config.dp.num_classes
 config.generator.hidden_sizes = [256, 256, 256]
@@ -79,7 +80,7 @@ config.generator.output_activation= nn.Identity()
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device
-config.teacher.checkpoint = 'logs/mnist_basic_config@1606652741/weights/model.pth'
+config.teacher.checkpoint = 'logs/mnist_basic_config@1606795480/weights/model.pth'
 config.teacher.input_size = 784
 config.teacher.hidden_sizes = [256, 256, 256]
 config.teacher.output_size = config.dp.num_classes

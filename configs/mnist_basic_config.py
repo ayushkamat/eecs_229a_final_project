@@ -11,9 +11,10 @@ config.seed = 1
 
 config.trainer = BasicTrainer
 config.tp.epochs = 16
-config.tp.log_train_every = 1000
+config.tp.log_train_every = 10
 config.tp.loss = nn.CrossEntropyLoss()
 config.tp.test_loss = nn.CrossEntropyLoss() # train and test separate for flexibility
+config.tp.use_gpu = False
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
 config.opt = Adam
 config.op.lr = 1e-3
@@ -43,4 +44,4 @@ config.mp.input_size = config.dp.resolution[0] * config.dp.resolution[1]
 config.mp.hidden_sizes = [256, 256, 256]
 config.mp.output_size = config.dp.num_classes
 config.mp.activation = nn.ReLU()
-config.mp.output_activation= nn.Identity()
+config.mp.output_activation= nn.LogSoftmax(dim=1)
