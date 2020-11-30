@@ -15,7 +15,7 @@ config.seed = 1
 
 config.trainer = GenerativeTrainer
 config.tp.epochs = 64
-config.tp.log_train_every = 50
+config.tp.log_train_every = 10
 config.tp.train_gen_every = 16
 config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(reduction='batchmean', log_target=True)(input, target)
 config.tp.student_loss = nn.MSELoss()
@@ -37,7 +37,7 @@ config.dp.seed = config.seed
 config.dp.gauss_dim = 100
 config.dp.num_classes = 2
 config.dp.batch_size = 128
-config.dp.num_samples = 100000
+config.dp.num_samples = 100
 
 config.test_dataset = ToyGauss
 config.tdp.device = config.tp.device

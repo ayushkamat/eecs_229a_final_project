@@ -24,7 +24,7 @@ config.dp.seed = config.seed # seed must match between test and train in order t
 config.dp.classes = [0, 1, 2, 3, 4, 5]
 config.dp.resolution = (28, 28)
 config.dp.dir = './data/cache/mnist/'
-config.dp.num_classes = 10
+config.dp.num_classes = 6
 config.dp.batch_size = 128
 
 

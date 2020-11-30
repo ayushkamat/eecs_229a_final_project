@@ -6,7 +6,7 @@ from tqdm import tqdm
 import os
 torch.autograd.set_detect_anomaly(True)
 
-class GenerativeTrainer(Trainer):
+class DecoupledGenerativeTrainer(Trainer):
     """
     Teacher is a trained model whose weights are loaded from a checkpoint.
     Student is a new model, potentially of a different architecture.
@@ -29,7 +29,7 @@ class GenerativeTrainer(Trainer):
         self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
         self.num_classes = self.c.dp.num_classes
 
-    def train(self, batch):
+    def train_generator(self, batch):
         # generated_input, teacher_output = batch
         # student_output = self.student(generated_input)
 
@@ -63,17 +63,32 @@ class GenerativeTrainer(Trainer):
         generated_outputs = epsilon * sigmas + means
 
         teacher_labels = self.teacher(generated_outputs)
+        # student_labels = self.student(generated_outputs)
+
+        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_labels, torch.cat(self.c.generator.num_samples * [labels.view(1, *labels.shape)], dim=0)) + self.c.tp.generator_loss(torch.cat(self.c.generator.num_samples * [labels.view(1, *labels.shape)], dim=0), teacher_labels)) - 0.0001 * self.c.tp.entropy_loss(means, sigmas)
+        # student_loss = -torch.log(self.c.tp.student_loss(student_labels, teacher_labels)) # train student to match teacher
+
+        result = {'train/generator_loss' : generator_loss, 'train/student_loss' : 0}
+
+        return result
+
+    def train_student(self, batch):
+        data, labels = batch
+        labels = torch.nn.functional.one_hot(labels).float()
+        means, sigmas = self.generator(labels)
+        dim = means.shape
+        epsilon = torch.randn(self.c.generator.num_samples, *dim).to(self.c.tp.device)
+        generated_outputs = epsilon * sigmas + means
+
+        teacher_labels = self.teacher(generated_outputs)
         student_labels = self.student(generated_outputs)
 
         generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_labels, torch.cat(self.c.generator.num_samples * [labels.view(1, *labels.shape)], dim=0)) + self.c.tp.generator_loss(torch.cat(self.c.generator.num_samples * [labels.view(1, *labels.shape)], dim=0), teacher_labels)) - self.c.tp.entropy_loss(means, sigmas)
         student_loss = -torch.log(self.c.tp.student_loss(student_labels, teacher_labels)) # train student to match teacher
 
-        result = {'train/generator_loss' : generator_loss,
-                  'train/student_loss'   : student_loss}
+        result = {'train/student_loss' : student_loss, 'train/generator_loss' : generator_loss}
 
         return result
-
-
 
     def test(self):
         # result = defaultdict(lambda: 0)
@@ -141,33 +156,46 @@ class GenerativeTrainer(Trainer):
 
 
     def run(self):
-        self.total_iterations = len(self.dataloader)*self.c.tp.epochs
+        self.total_iterations = len(self.dataloader)*self.c.tp.gen_epochs
         progress_bar = tqdm(total=self.total_iterations)
         
         self.test()
         generator_loss = torch.tensor(0)
         student_loss = torch.tensor(0)
-        for epoch in range(self.c.tp.epochs):
+        for epoch in range(self.c.tp.gen_epochs):
             for index, batch in enumerate(self.dataloader):
                 self.zero_grads()
-                if index % self.c.tp.train_gen_every != 0:
-                    result = self.train(batch)
-                    generator_loss = result['train/generator_loss']
-                    generator_loss.backward()
-                    self.gen_opt.step()
-                else:
-                    result = self.train(batch)
-                    student_loss = result['train/student_loss']
-                    student_loss.backward()
-                    self.stud_opt.step()
+                result = self.train_generator(batch)
+                generator_loss = result['train/generator_loss']
+                generator_loss.backward()
+                self.gen_opt.step()
 
                 if self.iteration % self.c.tp.log_train_every == 0:
                     self.log(result)
                 self.iteration += 1
-                progress_bar.set_description("Epoch {}/{} | Gen Loss {:.2e} Student Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item(), student_loss.item()))
+                progress_bar.set_description("Epoch {}/{} | Gen Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item()))
+                progress_bar.update(1)
+
+
+        self.total_iterations = len(self.dataloader)*self.c.tp.stu_epochs
+        progress_bar = tqdm(total=self.total_iterations)
+
+        generator_loss = torch.tensor(0)
+        student_loss = torch.tensor(0)
+        for epoch in range(self.c.tp.stu_epochs):
+            for index, batch in enumerate(self.dataloader):
+                self.zero_grads()
+                result = self.train_student(batch)
+                student_loss = result['train/student_loss']
+                student_loss.backward()
+                self.stud_opt.step()
+
+                if self.iteration % self.c.tp.log_train_every == 0:
+                    self.log(result)
+                self.iteration += 1
+                progress_bar.set_description("Epoch {}/{} | Gen Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item()))
                 progress_bar.update(1)
             self.test()
-
         self.save()
 
 
