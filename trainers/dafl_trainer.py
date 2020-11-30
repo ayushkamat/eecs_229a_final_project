@@ -3,7 +3,10 @@ from collections import defaultdict
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
+from matplotlib import pyplot as plt
 import os
+import torch.distributions as D
+
 torch.autograd.set_detect_anomaly(True)
 
 class DAFLTrainer(Trainer):
@@ -25,25 +28,28 @@ class DAFLTrainer(Trainer):
         self.dataloader = DataLoader(self.dataset, batch_size=self.c.dp.batch_size)
         self.test_dataset = self.c.test_dataset(self.c.tdp, mode='test')
         self.test_dataloader = DataLoader(self.test_dataset, batch_size=self.c.tdp.batch_size)
-        self.stud_opt = self.c.opt(self.student.parameters(), lr = self.c.op.lr)
-        self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
+        self.stud_opt = self.c.opt(self.student.parameters(), lr = self.c.op.s_lr)
+        self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.g_lr)
 
     def train(self, batch):
-        generated_input, teacher_output = batch
+        gaussian_means, gaussian_stds = batch
+        generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
+        generated_input = generated_distribution.rsample()
+        teacher_output = self.teacher(generated_input)
         student_output = self.student(generated_input)
-        
+        self.plot_generated_input(generated_input)
         # one hot loss
         pred = teacher_output.data.max(1)[1]
         one_hot_loss = self.c.tp.test_loss(teacher_output, pred)
-
+        
         # entropy loss
         mean_teacher = teacher_output.mean(dim=0)
         entropy_loss = (mean_teacher * torch.exp(mean_teacher)).sum()
 
         # student loss
-        kdloss = self.c.tp.student_loss(student_output, teacher_output.detach())
+        kdloss = self.c.tp.student_loss(student_output, teacher_output)
 
-        loss = 5 * entropy_loss + one_hot_loss
+        loss = self.c.tp.entropy_loss_weight * entropy_loss + one_hot_loss
 
         result = {'train/generator_loss': loss,
             'train/student_loss': kdloss,
@@ -67,6 +73,15 @@ class DAFLTrainer(Trainer):
         self.log(result)
         return result
 
+    def plot_generated_input(self, generated_input):
+        """ Plots the first two dimensions of the generated input as well as the means of the test data gaussians """
+
+        for g in self.test_dataset.gaussians:
+            plt.scatter(g.mean[0], g.mean[1])
+        plt.scatter(generated_input[:, 0].detach().cpu(), generated_input[:, 1].detach().cpu(), color='black')
+        plt.savefig(os.path.join(self.c.plots_path, 'generated_iteration_{}'.format(self.iteration)))
+        plt.clf()
+
     def zero_grads(self):
         self.teacher.zero_grad()
         self.generator.zero_grad()
@@ -82,7 +97,7 @@ class DAFLTrainer(Trainer):
         for epoch in range(self.c.tp.epochs):
             for ind, batch in enumerate(self.dataloader):
                 self.zero_grads()
-                if ind % self.c.tp.train_gen_every == 0:
+                if ind % self.c.tp.train_student_every != 0:
                     result = self.train(batch)
                     generator_loss = result['train/generator_loss']
                     generator_loss.backward()

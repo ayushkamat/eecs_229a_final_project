@@ -31,10 +31,20 @@ def initialize_dirs_and_files(args, config):
         shutil.rmtree(exp_path)
         os.mkdir(exp_path)
     config.exp_path = exp_path
+
+    # set up weights dir
     weights_path = os.path.join(config.exp_path, args.weights_dir)
     if not os.path.exists(weights_path):
         os.mkdir(weights_path)
     config.weights_path = weights_path
+
+    # set up plot dir
+    plots_path = os.path.join(config.exp_path, args.plots_dir)
+    if not os.path.exists(plots_path):
+        os.mkdir(plots_path)
+    config.plots_path = plots_path
+
+    # save configuration
     filename = os.path.join(exp_path, 'config.json')
     json.dump(config.toDict(), open(filename, 'w'), default=lambda o: str(o), indent=4)
 

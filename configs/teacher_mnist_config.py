@@ -31,7 +31,7 @@ config.dp.num_samples = 100000
 
 # Config needs to match with teacher model config
 config.test_dataset = MNISTData
-config.dp.device = config.tp.device
+config.tdp.device = config.tp.device
 config.tdp.seed = 1
 config.tdp.classes = [0, 1, 2, 3, 4, 5]
 config.tdp.resolution = (28, 28)
@@ -41,7 +41,7 @@ config.tdp.batch_size = 128
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device
-config.teacher.checkpoint = 'logs/mnist_basic_config@1605591728/weights/model.pth'
+config.teacher.checkpoint = 'logs/mnist_basic_config@1606664541/weights/model.pth'
 config.teacher.input_size = 28 * 28
 config.teacher.hidden_sizes = [256, 256, 256]
 config.teacher.output_size = config.dp.num_classes
@@ -51,7 +51,7 @@ config.teacher.output_activation= nn.LogSoftmax(dim=1)
 config.student.model = mlp
 config.student.device = config.tp.device
 config.student.input_size = 28 * 28
-config.student.hidden_sizes = [128, 128, 128]
+config.student.hidden_sizes = [256, 256, 256]
 config.student.output_size = config.dp.num_classes
 config.student.activation = nn.ReLU()
 config.student.output_activation= nn.LogSoftmax(dim=1)
