@@ -43,4 +43,4 @@ config.mp.input_size = config.dp.resolution[0] * config.dp.resolution[1]
 config.mp.hidden_sizes = [256, 256, 256]
 config.mp.output_size = config.dp.num_classes
 config.mp.activation = nn.ReLU()
-config.mp.output_activation= nn.Identity()
+config.mp.output_activation= nn.LogSoftmax(dim=1)
