@@ -22,6 +22,7 @@ config.tp.use_gpu = True
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
 config.tp.negative_disagreement_weight = 1
 config.tp.kl_constraint_weight = 1
+config.tp.prior_only = False
 
 config.opt = Adam
 config.op.lr = 1e-3
