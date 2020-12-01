@@ -27,6 +27,7 @@ class GenerativeTrainer(Trainer):
         self.test_dataloader = DataLoader(self.test_dataset, batch_size=self.c.tdp.batch_size)
         self.stud_opt = self.c.opt(self.student.parameters(), lr = self.c.op.lr)
         self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
+        self.num_classes = self.c.dp.num_classes
 
     def train(self, batch):
         # generated_input, teacher_output = batch
@@ -55,16 +56,16 @@ class GenerativeTrainer(Trainer):
 
 
         data, labels = batch
-        labels = labels.reshape(-1, 1).float()
+        labels = torch.nn.functional.one_hot(labels).float()
         means, sigmas = self.generator(labels)
         dim = means.shape
-        epsilon = torch.randn(self.c.generator.num_samples, *dim)
+        epsilon = torch.randn(self.c.generator.num_samples, *dim).to(self.c.tp.device)
         generated_outputs = epsilon * sigmas + means
 
         teacher_labels = self.teacher(generated_outputs)
         student_labels = self.student(generated_outputs)
 
-        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_labels, labels) + self.c.tp.generator_loss(labels, teacher_labels)) + 0.1 * torch.exp(-self.c.tp.entropy_loss(means, sigmas))
+        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_labels, torch.cat(self.c.generator.num_samples * [labels.view(1, *labels.shape)], dim=0)) + self.c.tp.generator_loss(torch.cat(self.c.generator.num_samples * [labels.view(1, *labels.shape)], dim=0), teacher_labels)) - self.c.tp.entropy_loss(means, sigmas)
         student_loss = -torch.log(self.c.tp.student_loss(student_labels, teacher_labels)) # train student to match teacher
 
         result = {'train/generator_loss' : generator_loss,
@@ -110,10 +111,11 @@ class GenerativeTrainer(Trainer):
         with torch.no_grad():
             for i, batch in enumerate(self.test_dataloader):
                 data, labels = batch
-                labels = labels.reshape(-1, 1).float()
+                labels = torch.nn.functional.one_hot(labels).float()
+
                 means, sigmas = self.generator(labels)
                 dim = means.shape
-                epsilon = torch.randn(*dim)
+                epsilon = torch.randn(*dim).to(self.c.tp.device)
                 generated_outputs = epsilon * sigmas + means
 
                 student_predictions = self.student(generated_outputs)

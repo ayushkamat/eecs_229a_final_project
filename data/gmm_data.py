@@ -55,7 +55,7 @@ class GMMData(Dataset):
 
         return GMMData(self.dp, means, cov_mtxs, self.mode)
 
-    def sample(self, nsample, class_index=-1):
+    def sample(self, nsample=1, class_index=-1):
         """
         Sample the underlying distribution
         """
@@ -64,21 +64,22 @@ class GMMData(Dataset):
             idx = class_index if class_index >= 0 else np.random.choice(np.arange(self.dp.num_classes))
             gaussian = self.gaussians[idx]
             xs.append(gaussian.sample())
+        if nsample == 1: return xs[0]
         return torch.stack(xs).to(self.dp.device)
 
     def log_prob(self, x):
         """
         Compute likelihood of point x
         """
-        out = []
         xs = x if len(x.shape) == 2 else [x]
-        for pt in x:
-            log_probs = torch.stack([g.log_prob(pt) for g in self.gaussians]).to(self.dp.device)
-            probs = torch.exp(log_probs)
-            out.append(torch.sum(probs) / self.dp.num_classes)
-        out = torch.log(torch.stack(out).to(self.dp.device))
-        if len(x.shape) == 1: out = out[0]
-        return out
+        probs = []
+        for g in self.gaussians:
+            probs.append(torch.exp(g.log_prob(x).double()))
+        probs = torch.stack(probs, axis=1)
+        probs = torch.sum(probs, axis=1) / self.dp.num_classes
+        probs = torch.log(probs).float()
+        if len(x.shape) == 1: probs = probs[0]
+        return probs
 
     def __len__(self):
         return self.dp.num_samples
