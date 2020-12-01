@@ -31,16 +31,26 @@ class AdversarialTrainer(Trainer):
         self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
 
     def train(self, batch):
-        gaussian_means, gaussian_stds = batch
-        generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
-        generated_input = generated_distribution.rsample((self.c.dp.batch_size,))
+        if self.c.tp.prior_only:
+            generated_input = self.test_dataset.input_prior.rsample((self.c.dp.batch_size,))
+        else:
+            gaussian_means, gaussian_stds = batch
+            generated_distribution = D.MultivariateNormal(gaussian_means, gaussian_stds)
+            generated_input = generated_distribution.rsample((self.c.dp.batch_size,))
+
         teacher_output = self.teacher(generated_input)
         # self.plot_generated_input(generated_input)
-
         student_output = self.student(generated_input)
-        negative_disagreement = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
-        kl_constraint = torch.distributions.kl_divergence(generated_distribution, self.test_dataset.input_prior).mean()
-        generator_loss = self.c.tp.negative_disagreement_weight * negative_disagreement + self.c.tp.kl_constraint_weight * kl_constraint
+
+        if self.c.tp.prior_only:
+            negative_disagreement = 0
+            kl_constraint = 0
+            generator_loss = 0
+        else:
+            negative_disagreement = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
+            kl_constraint = torch.distributions.kl_divergence(generated_distribution, self.test_dataset.input_prior).mean()
+            generator_loss = self.c.tp.negative_disagreement_weight * negative_disagreement + self.c.tp.kl_constraint_weight * kl_constraint
+
         student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
         result = {'train/student_loss': student_loss,
@@ -91,7 +101,7 @@ class AdversarialTrainer(Trainer):
         for epoch in range(self.c.tp.epochs):
             for ind, batch in enumerate(self.dataloader):
                 self.zero_grads()
-                if ind % self.c.tp.train_student_every != 0:
+                if ind % self.c.tp.train_student_every != 0 and not self.c.tp.prior_only:
                     result = self.train(batch)
                     generator_loss = result['train/generator_loss']
                     generator_loss.backward()
