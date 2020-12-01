@@ -1,17 +1,14 @@
 from trainers.trainer import Trainer
 from collections import defaultdict 
 from torch.utils.data import DataLoader
-from torch.autograd import Variable
-
 import torch
 from tqdm import tqdm
-from matplotlib import pyplot as plt
-import os
-import torch.distributions as D
+from torch.autograd import Variable
 
+import os
 torch.autograd.set_detect_anomaly(True)
 
-class DAFLTrainer(Trainer):
+class AdversarialConvTrainer(Trainer):
     """
     Teacher is a trained model whose weights are loaded from a checkpoint.
     Student is a new model, potentially of a different architecture.
@@ -22,7 +19,7 @@ class DAFLTrainer(Trainer):
         super().__init__(config)
         self.teacher = self.c.teacher.model(self.c.teacher)
         self.student = self.c.student.model(self.c.student)
-        self.generator = self.c.generator.model(self.c.generator).cuda()
+        self.generator = self.c.generator.model(self.c.generator)
         self.teacher.load_state_dict(torch.load(self.c.teacher.checkpoint))
         self.c.dp.teacher = self.teacher
         self.c.dp.generator = self.generator
@@ -30,8 +27,8 @@ class DAFLTrainer(Trainer):
         self.dataloader = DataLoader(self.dataset, batch_size=self.c.dp.batch_size)
         self.test_dataset = self.c.test_dataset(self.c.tdp, mode='test')
         self.test_dataloader = DataLoader(self.test_dataset, batch_size=self.c.tdp.batch_size)
-        self.stud_opt = self.c.opt(self.student.parameters(), lr = self.c.op.s_lr)
-        self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.g_lr)
+        self.stud_opt = self.c.opt(self.student.parameters(), lr = self.c.op.lr)
+        self.gen_opt = self.c.opt(self.generator.parameters(), lr = self.c.op.lr)
 
     def train(self, batch):
         data, labels = batch
@@ -39,22 +36,13 @@ class DAFLTrainer(Trainer):
         generated_inputs = torch.flatten(torch.squeeze(self.generator(z)), 1, 2)
         teacher_output = self.teacher(generated_inputs)
         student_output = self.student(generated_inputs)
-        
-        # one hot loss
-        pred = teacher_output.data.max(1)[1]
-        one_hot_loss = self.c.tp.test_loss(teacher_output, pred)
-        # entropy loss
-        mean_teacher = teacher_output.mean(dim=0)
-        entropy_loss = (mean_teacher * torch.exp(mean_teacher)).sum()
-        # student loss
-        kdloss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
-        loss = self.c.tp.entropy_loss_weight * entropy_loss + one_hot_loss
+        generator_loss = 0.5 * (self.c.tp.generator_loss(teacher_output, student_output) + self.c.tp.generator_loss(student_output, teacher_output))
+        student_loss = self.c.tp.student_loss(student_output, teacher_output.detach())
 
-        result = {'train/generator_loss': loss,
-            'train/student_loss': kdloss,
-            'train/entropy_loss': entropy_loss,
-            'train/one_hot_loss': one_hot_loss}
+        result = {'train/student_loss': student_loss,
+                  'train/generator_loss': generator_loss}
+
         return result
 
     def test(self):
@@ -102,7 +90,7 @@ class DAFLTrainer(Trainer):
                 if self.iteration % self.c.tp.log_train_every == 0:
                     self.log(result)
                 self.iteration += 1
-                pbar.set_description("Epoch {}/{} | Loss One Hot {:.2e} Loss Entropy {:.2e} Generator Loss {:.2e} Student Loss {:.2e}".format(epoch+1, self.c.tp.epochs, result['train/one_hot_loss'], result['train/entropy_loss'], result['train/generator_loss'], result['train/student_loss']))
+                pbar.set_description("Epoch {}/{} | Gen Loss {:.2e} Student Loss {:.2e}".format(epoch+1, self.c.tp.epochs, generator_loss.item(), student_loss.item()))
                 pbar.update(1)
             self.test()
 
@@ -112,4 +100,3 @@ class DAFLTrainer(Trainer):
         torch.save(self.generator.state_dict(), os.path.join(self.c.weights_path, '{}.pth'.format('generator')))
         torch.save(self.student.state_dict(), os.path.join(self.c.weights_path, '{}.pth'.format('student')))
         torch.save(self.teacher.state_dict(), os.path.join(self.c.weights_path, '{}.pth'.format('teacher')))
-

@@ -1,9 +1,10 @@
 from dotmap import DotMap
-from trainers.dafl_trainer import DAFLTrainer
+from trainers.adversarial_conv_gen_trainer import AdversarialConvTrainer
 from data.adversarial_mnist_data import AdversarialMNISTData
 from data.mnist_data import MNISTData
 from models.mlp import mlp
 from models.conv_generator import ConvGenerator
+
 from torch import nn
 from torch.optim import Adam
 import torch
@@ -11,20 +12,20 @@ import torch
 config = DotMap()
 config.seed = 1
 
-config.trainer = DAFLTrainer
-config.tp.epochs = 200
+config.trainer = AdversarialConvTrainer
+config.tp.epochs = 64
 config.tp.log_train_every = 50
 config.tp.train_student_every = 25
-config.tp.generator_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
+config.tp.generator_loss = lambda input, target : -nn.KLDivLoss(log_target=True, reduction='batchmean')(input, target)
 config.tp.student_loss = nn.KLDivLoss(log_target=True, reduction='batchmean')
-config.tp.entropy_loss_weight = 5
 config.tp.test_loss = nn.NLLLoss() 
 config.tp.use_gpu = True
 config.tp.device = torch.device('cuda') if config.tp.use_gpu else torch.device('cpu')
+config.tp.negative_disagreement_weight = 1
+config.tp.kl_constraint_weight = 1
 
 config.opt = Adam
-config.op.s_lr = 2e-3
-config.op.g_lr = .2
+config.op.lr = 1e-3
 
 config.dataset = MNISTData
 config.dp.device = config.tp.device
@@ -33,7 +34,7 @@ config.dp.classes = [0, 1, 2, 3, 4, 5]
 config.dp.resolution = (28, 28)
 config.dp.dir = './data/cache/mnist/'
 config.dp.num_classes = 6
-config.dp.batch_size = 512
+config.dp.batch_size = 32
 
 config.test_dataset = MNISTData
 config.tdp.device = config.tp.device

@@ -41,7 +41,7 @@ config.tdp.batch_size = 128
 
 config.teacher.model = mlp
 config.teacher.device = config.tp.device
-config.teacher.checkpoint = 'logs/mnist_basic_config@1606750278/weights/model.pth'
+config.teacher.checkpoint = 'logs/mnist_basic_config@1606815386/weights/model.pth'
 config.teacher.input_size = 28 * 28
 config.teacher.hidden_sizes = [256, 256, 256]
 config.teacher.output_size = config.dp.num_classes
