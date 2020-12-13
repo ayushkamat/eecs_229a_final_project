@@ -24,9 +24,9 @@ def empirical_entropy(tensor):
     opts = torch.unique(tensor)
     entr = 0
     for opt in opts:
-        p = torch.sum(tensor==opt) / len(tensor)
+        p = torch.sum(tensor==opt) / float(len(tensor))
         p = p.float()
-        entr -= p * torch.log2(p)
+        if p > 0: entr -= p * torch.log2(p)
     return entr
 
 def empirical_posterior_entropy(distr_p,  model, nsamples=10**3):
@@ -37,4 +37,9 @@ def empirical_posterior_entropy(distr_p,  model, nsamples=10**3):
         ys = torch.argmax(ys, dim=1)
         ent += empirical_entropy(ys)
     return ent / distr_p.num_classes
-        
+
+def empirical_distr_entropy(distr_p, model, nsamples=10**3):
+    X = distr_p.sample(nsamples)
+    ys = model(X)
+    ys = torch.argmax(ys, dim=1)
+    return empirical_entropy(ys)

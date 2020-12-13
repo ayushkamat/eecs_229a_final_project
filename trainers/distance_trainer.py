@@ -47,14 +47,16 @@ class DistanceTrainer(Trainer):
         return result
 
     def compare(self, teacher, student, teacher_data, student_data):
-        result = {'student_acc':0}
+        result = {'student_acc':0, 'true_student_acc': 0}
         dataloader = DataLoader(teacher_data, batch_size=self.c.dp.batch_size)
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 x,y = batch
                 pred = student(x)
+                teacher_pred = teacher(x)
                 loss = self.c.tp.test_loss(pred, y)
-                result['student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
+                result['student_acc'] += (torch.argmax(pred, dim=1) == torch.argmax(teacher_pred, dim=1)).double().mean()
+                result['true_student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
         
         for k in result:
             result[k] = result[k]/(i+1)
@@ -62,9 +64,15 @@ class DistanceTrainer(Trainer):
         result['student_to_teacher_kl_divergence'] = empirical_kl(student_data, teacher_data, nsamples=10**4).cpu().detach().item()
         result['teacher_to_student_kl_divergence'] = empirical_kl(teacher_data, student_data, nsamples=10**4).cpu().detach().item()
         result['teacher_conditional_entropy'] = empirical_posterior_entropy(student_data, teacher, nsamples=10**4).cpu().detach().item()
+
+        student_sample = student_data.sample(10**3)
+        teacher_preds = teacher(student_sample)
+        teacher_preds = torch.argmax(teacher_preds, dim=1)
+        result['teacher_entropy'] = empirical_entropy(teacher_preds).cpu().detach().item()
         result['student_loc'] = student_data.means.cpu().detach().numpy()
         result['teacher_loc'] = teacher_data.means.cpu().detach().numpy()
         result['student_acc'] = result['student_acc'].cpu().detach().item()
+        result['true_student_acc'] = result['true_student_acc'].cpu().detach().item()
         return result
 
     def run(self):

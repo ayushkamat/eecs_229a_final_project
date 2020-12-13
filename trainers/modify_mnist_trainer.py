@@ -44,20 +44,24 @@ class ModifyMNISTTrainer(Trainer):
         return result
 
     def compare(self, teacher, student, teacher_data, student_data):
-        result = {'student_acc':0}
+        result = {'student_acc':0, 'true_student_acc': 0}
         dataloader = DataLoader(teacher_data, batch_size=self.c.dp.batch_size)
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 x,y = batch
                 pred = student(x)
+                teacher_pred = teacher(x)
                 loss = self.c.tp.test_loss(pred, y)
-                result['student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
+                result['student_acc'] += (torch.argmax(pred, dim=1) == torch.argmax(teacher_pred, dim=1)).double().mean()
+                result['true_student_acc'] += (torch.argmax(pred, dim=1) == y).double().mean()
         
         for k in result:
             result[k] = result[k]/(i+1)
 
         result['teacher_conditional_entropy'] = empirical_posterior_entropy(student_data, teacher, nsamples=10**4).cpu().detach().item()
+        result['teacher_entropy'] = empirical_distr_entropy(student_data, teacher, nsamples=10**4).cpu().detach().item()
         result['student_acc'] = result['student_acc'].cpu().detach().item()
+        result['true_student_acc'] = result['true_student_acc'].cpu().detach().item()
         return result
 
     def run(self):
@@ -86,6 +90,7 @@ class ModifyMNISTTrainer(Trainer):
                     teacher_opt = self.c.opt(teacher.parameters(), lr = self.c.op.lr)
                     pbar3 = tqdm(total=self.c.tp.epochs*len(data), position=4, leave=False)
                     pbar3.set_description("Teacher {} acc {:.2e} | Noise {} | Corrupt {} | Epoch -1".format(nt, 0, noise_rate, corrupt_rate))
+                    pbar3.update(1)
 
                     for epoch in range(self.c.tp.epochs):
                         for ind, batch in enumerate(dataloader):
@@ -161,6 +166,7 @@ class ModifyMNISTTrainer(Trainer):
             teacher_opt = self.c.opt(teacher.parameters(), lr = self.c.op.lr)
             pbar3 = tqdm(total=self.c.tp.epochs*len(data), position=4, leave=False)
             pbar3.set_description("Teacher {} acc {:.2e} | Noise {} | Corrupt {}".format(nt, 0, noise_rate, corrupt_rate))
+            pbar3.update(1)
 
             for epoch in range(self.c.tp.epochs):
                 for ind, batch in enumerate(dataloader):
